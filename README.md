@@ -1,25 +1,48 @@
-# 🎓 Project
+# 🏎️ HPP Grand Prix: High-Performance Programming Competition
 
-By the end of the project, you will be able to:
-* Optimize and design neural networks.
-* Optimize and design sparse neural networks.
-* Implement and optimize matrix multiplication.
+## 🎓 Learning Objectives
 
+By the end of this project, you will be able to:
+* Design and optimize dense neural networks on CPU and GPU.
+* Implement efficient sparse neural networks with tunable sparsity levels.
+* Develop high-performance matrix multiplication (MM) and matrix-vector (MV) kernels.
+* Optimize sparse matrix operations (SpMM and SpMV) for various sparsity ratios.
+* Compete with and potentially outperform industry-standard libraries (Intel MKL, cuBLAS, cuSPARSE).
 
 **Note:** You must review Tutorial 01 before starting this lab. You will need to
 finish tutorial 02 for the GPU part.
-***
+
+---
+
+## 🏆 Competition Leaderboard
+
+This is not just an assignment—it's a **COMPETITION**! Your implementations will be ranked against:
+- **CPU Baseline:** Intel MKL (Matrix Kernel Library)
+- **GPU Baseline:** NVIDIA cuBLAS and cuSPARSE
+
+### 🥇 Bonus Point Targets
+- **Sparse NN vs Dense MKL (CPU):** Target **1.2× speedup** 
+- **Sparse NN vs Dense cuBLAS (GPU):** Target **1.1× speedup**
+- Achieve these targets and receive **BONUS POINTS**!
+
+### 📊 Metrics Tracked
+- **Per-Kernel Speedup:** Geometric mean speedup for each operation (GEMM, GEMV, SpMM, SpMV)
+- **Cross-Kernel Speedup:** Overall geometric mean speedup across all 4 kernels
+- **Scalability:** Performance across 8 different matrix sizes (256 to 32768)
+- **Sparsity Efficiency:** Speedup improvement at 50%, 70%, 80%, and 90% sparsity levels
+
+---
 
 ## DEADLINE: 2026-11-27 23:59:59
 
 ## 🛠️ Logging in to the ECE Cluster
 The ECE computer server is a local server used for this course. The ECE server
-has 6 nodes, each with a 20-core Intel CPU and an Ada2000 GPU. The ECE server
+has 6 nodes, each with a 20-core Intel CPU and an NVIDIA Ada2000 GPU. The ECE server
 uses a SLURM scheduler. SLURM (Simple Linux Utility for Resource Management)
 is an open-source workload manager that allocates exclusive resources (computer nodes)
 to users for a specific duration to run their tasks. It manages a queue of jobs,
 ensuring that resources are used efficiently and jobs are run fairly. You will
-need a username to log in to the server.  Your username  and password is provided to you.
+need a username to log in to the server. Your username and password are provided to you.
 With that, you will need to SSH to the server using the
 following command:
 

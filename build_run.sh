@@ -38,18 +38,29 @@ python3 $(pwd)/script/dense_nn.py
 python3 $(pwd)/script/sparsify_weight.py
 
 
-echo "---- Running CPU ----"
+echo "---- Running CPU Benchmarks ----"
 
 mkdir -p $(pwd)/logs
+echo "Running GEMM/GEMV/SpMM/SpMV benchmarks..."
 $(pwd)/build/project --benchmark_out="$(pwd)/logs/project.json" --benchmark_out_format=json --benchmark_perf_counters="L1-dcache-loads"
+
+echo "Computing speedup metrics for CPU kernels..."
+python3 $(pwd)/script/compute_speedup.py $(pwd)/logs/project.json $(pwd)/logs/cpu_speedup_report.txt
+
+echo "Running NN CPU benchmarks..."
 $(pwd)/build/nn_cpu --benchmark_out="$(pwd)/logs/nn_cpu.json" --benchmark_out_format=json
 
 
-echo "---- Running GPU----"
+echo "---- Running GPU Benchmarks ----"
 
+echo "Running GEMM/GEMV/SpMM/SpMV GPU benchmarks..."
 $(pwd)/build/project_gpu --json "$(pwd)/logs/project_gpu.json"
-$(pwd)/build/nn_gpu --json "$(pwd)/logs/nn_gpu.json"
 
+echo "Computing speedup metrics for GPU kernels..."
+python3 $(pwd)/script/compute_speedup.py $(pwd)/logs/project_gpu.json $(pwd)/logs/gpu_speedup_report.txt
+
+echo "Running NN GPU benchmarks..."
+$(pwd)/build/nn_gpu --json "$(pwd)/logs/nn_gpu.json"
 
 
 echo "---- Running Tests ----"
@@ -61,3 +72,5 @@ echo "---- Plotting ----"
 
 mkdir -p $(pwd)/plots
 python3 $(pwd)/script/plot.py $(pwd)/logs/project.json
+
+echo "---- All benchmarks completed ----"

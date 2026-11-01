@@ -77,7 +77,6 @@ include_directories(
 
 add_executable(project
         src/utils.cpp
-        src/dense_nn.cpp
         src/gemm.cpp
         src/gemv.cpp
         src/spmm.cpp
@@ -90,30 +89,16 @@ target_link_libraries(project
         benchmark::benchmark
 )
 
-add_executable(nn_cpu
-        src/utils.cpp
-        src/dense_nn.cpp
-        src/gemm.cpp
-        src/gemv.cpp
-        src/spmm.cpp
-        src/spmv.cpp
-        src/sparse_nn.cpp
-        nn_cpu_bench.cpp
-)
-target_compile_options(nn_cpu PRIVATE -mavx2 -mfma -march=native)
-target_link_libraries(nn_cpu
-        benchmark::benchmark)
+
+
 
 if(OPENMP)
     target_link_libraries(project OpenMP::OpenMP_CXX)
-    target_link_libraries(nn_cpu OpenMP::OpenMP_CXX)
 endif()
 
 if(USE_MKL)
     target_link_libraries(project MKL::MKL)
     target_compile_definitions(project PRIVATE USE_MKL)
-    target_link_libraries(nn_cpu MKL::MKL)
-    target_compile_definitions(nn_cpu PRIVATE USE_MKL)
 endif()
 
 # GPU support
@@ -142,15 +127,6 @@ if(GPU_ENABLED)
         target_link_libraries(project_gpu
                 nvbench::main)
 
-        add_executable(nn_gpu
-                src/utils.cpp
-                src/kernels.cu
-                src/gpu_dense_nn.cu
-                src/gpu_sparse_nn.cu
-                nn_gpu_bench.cu
-        )
-        target_link_libraries(nn_gpu
-                nvbench::main)
     else()
         message(STATUS "CUDA compiler not found; GPU executables will not be built")
     endif()
