@@ -38,9 +38,10 @@ def forward_pass(X, W1, W2, B1, B2):
     Y = argmax(Z)
     """
 
-    Z = []
-    Y = []
-    # TODO: Implement forward pass
+    # TODO: IMPLEMENT THIS
+    batch = X.shape[0]
+    Z = np.zeros((batch, W2.shape[0]))
+    Y = np.zeros(batch, dtype=int)
     return Y, Z
 
 def calculate_accuracy(predictions, labels):

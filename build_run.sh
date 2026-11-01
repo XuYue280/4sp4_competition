@@ -4,6 +4,7 @@
 #SBATCH --export=ALL
 #SBATCH --job-name="project"
 #SBATCH --nodes=1
+#SBATCH --gres=gpu:1
 #SBATCH --output="project.%j.%N.out"
 #SBATCH -t 00:45:00
 ##################### SLURM (do not change) ^  #####################
@@ -18,9 +19,9 @@ SHAREDDIR=/home/coe4sp4/
 
 # Source Intel MKL environment
 source /opt/intel/oneapi/setvars.sh --force
+export PATH=/usr/local/cuda/bin:${PATH}
 
-cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${SHAREDDIR}/libpfm4/ -DPROFILING_ENABLED=ON -DUSE_MKL=ON -DOPENMP=ON
-#cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${SHAREDDIR}/libpfm4/ -DPROFILING_ENABLED=ON -DUSE_MKL=ON -DOPENMP=ON -DGPU_ENABLED=ON
+cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${SHAREDDIR}/libpfm4/ -DPROFILING_ENABLED=ON -DUSE_MKL=ON -DOPENMP=ON -DGPU_ENABLED=ON
 cmake --build $(pwd)/build -- -j8
 
 
@@ -45,11 +46,9 @@ $(pwd)/build/nn_cpu --benchmark_out="$(pwd)/logs/nn_cpu.json" --benchmark_out_fo
 
 
 echo "---- Running GPU----"
-echo "Note: To run the GPU part, you will need to first enable GPU by adding -DGPU_ENABLED=ON to the CMake command"
 
-# Uncomment the lines below when GPU implementation is complete and GPU is enabled
-#$(pwd)/build/project_gpu --json "$(pwd)/logs/project_gpu.json"
-#$(pwd)/build/nn_gpu --json "$(pwd)/logs/nn_gpu.json"
+$(pwd)/build/project_gpu --json "$(pwd)/logs/project_gpu.json"
+$(pwd)/build/nn_gpu --json "$(pwd)/logs/nn_gpu.json"
 
 
 

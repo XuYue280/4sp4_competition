@@ -21,21 +21,21 @@ def plot_google_benchmark_median(json_path):
         print(f"Error: Could not parse JSON file {json_path}")
         return
 
-    # TODO: Extract benchmark data and create plots
-    # Expected structure: data["benchmarks"] contains list of benchmark results
-    # Each result has "name", "median_time", "iterations", etc.
-
     if "benchmarks" not in data:
         print("Warning: No benchmarks found in JSON file")
         return
 
     benchmarks = data["benchmarks"]
-    names = [b.get("name", "Unknown") for b in benchmarks]
-    times = [b.get("median_time", 0) for b in benchmarks]
+    chosen = [b for b in benchmarks if b.get("aggregate_name") == "median"]
+    if not chosen:
+        chosen = [b for b in benchmarks if b.get("run_type") != "aggregate"]
+    names = [b.get("name", "Unknown") for b in chosen]
+    times = [b.get("cpu_time", 0) for b in chosen]
+    unit = chosen[0].get("time_unit", "ns") if chosen else "ns"
 
     plt.figure(figsize=(12, 6))
     plt.bar(names, times)
-    plt.ylabel("Time (ns)")
+    plt.ylabel(f"Time ({unit})")
     plt.xlabel("Benchmark Name")
     plt.title("Google Benchmark Median Times")
     plt.xticks(rotation=45, ha="right")

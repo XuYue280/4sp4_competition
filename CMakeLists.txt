@@ -80,6 +80,8 @@ add_executable(project
         src/dense_nn.cpp
         src/gemm.cpp
         src/gemv.cpp
+        src/spmm.cpp
+        src/spmv.cpp
         main_bench.cpp
 )
 target_compile_options(project PRIVATE -mavx2 -mfma -march=native)
@@ -93,6 +95,9 @@ add_executable(nn_cpu
         src/dense_nn.cpp
         src/gemm.cpp
         src/gemv.cpp
+        src/spmm.cpp
+        src/spmv.cpp
+        src/sparse_nn.cpp
         nn_cpu_bench.cpp
 )
 target_compile_options(nn_cpu PRIVATE -mavx2 -mfma -march=native)
@@ -120,31 +125,35 @@ if(GPU_ENABLED)
 
     # Enable CUDA language before setting CUDA-specific properties
     enable_language(CUDA OPTIONAL)
-    # Set CUDA standard
-    set(CMAKE_CUDA_STANDARD 14)
-    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    if(CMAKE_CUDA_COMPILER)
+        # Set CUDA standard
+        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-    # Use CPM to fetch NVBench's main branch.
-    # CPM: https://github.com/cpm-cmake/CPM.cmake
-    # NVBench: https://github.com/NVIDIA/nvbench
-    include(cmake/CPM.cmake)
-    CPMAddPackage("gh:NVIDIA/nvbench#main")
+        # CPM: https://github.com/cpm-cmake/CPM.cmake
+        # NVBench: https://github.com/NVIDIA/nvbench
+        include(cmake/CPM.cmake)
+        CPMAddPackage("gh:NVIDIA/nvbench#main")
 
-    add_executable(project_gpu
-            main_bench.cu)
+        add_executable(project_gpu
+                main_bench.cu
+                src/kernels.cu)
 
-    target_link_libraries(project_gpu
-            nvbench::main)
+        target_link_libraries(project_gpu
+                nvbench::main)
 
-    add_executable(nn_gpu
-            src/utils.cpp
-            src/gpu_dense_nn.cu
-            src/gpu_sparse_nn.cu
-            nn_gpu_bench.cu
-    )
-    target_link_libraries(nn_gpu
-            nvbench::main)
-
+        add_executable(nn_gpu
+                src/utils.cpp
+                src/kernels.cu
+                src/gpu_dense_nn.cu
+                src/gpu_sparse_nn.cu
+                nn_gpu_bench.cu
+        )
+        target_link_libraries(nn_gpu
+                nvbench::main)
+    else()
+        message(STATUS "CUDA compiler not found; GPU executables will not be built")
+    endif()
 endif()
 
 add_subdirectory(test)

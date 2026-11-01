@@ -14,7 +14,7 @@
 namespace swiftware::hpp {
 
 
-    // TODO Implement Dense NN with GEMM
+    // TODO: IMPLEMENT THIS
     DenseMatrix *dense_nn_gemm(DenseMatrix *InData,
                                DenseMatrix *W1, DenseMatrix *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp) {
         int batchSize = InData->m;
@@ -24,7 +24,7 @@ namespace swiftware::hpp {
         return pred;
     }
 
-    //TODO: Implement Dense NN with GEMV
+    // TODO: IMPLEMENT THIS
     DenseMatrix *dense_nn_gemv(DenseMatrix *InData, DenseMatrix *W1, DenseMatrix *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp){
         int batchSize = InData->m;
         DenseMatrix *pred = new DenseMatrix(batchSize, 1);
@@ -37,6 +37,7 @@ namespace swiftware::hpp {
     void gemmMKL(int m, int n, int k, const float *A, const float *B, float *C, ScheduleParams Sp);
     void gemvMKL(int m, int n, const float *A, const float *x, float *y, ScheduleParams Sp);
     
+    // TODO: IMPLEMENT THIS
     DenseMatrix *dense_nn_mkl_gemm(DenseMatrix *InData,
                               DenseMatrix *W1, DenseMatrix *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp) {
         int batchSize = InData->m;
@@ -46,6 +47,7 @@ namespace swiftware::hpp {
         return pred;
     }
     
+    // TODO: IMPLEMENT THIS
     DenseMatrix *dense_nn_mkl_gemv(DenseMatrix *InData,
                                    DenseMatrix *W1, DenseMatrix *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp) {
         int batchSize = InData->m;

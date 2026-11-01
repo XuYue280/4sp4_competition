@@ -13,7 +13,7 @@
 namespace swiftware::hpp {
 
 
-    //TODO Implement Sparse NN with SPMM
+    // TODO: IMPLEMENT THIS
   DenseMatrix *sparseNNSpmm(DenseMatrix *InData,
                             CSR *W1, CSR *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp) {
     int batchSize = InData->m;
@@ -23,7 +23,7 @@ namespace swiftware::hpp {
     return pred;
   }
 
-    //TODO: Implement Sparse NN with SPMV
+    // TODO: IMPLEMENT THIS
     DenseMatrix *sparseNNSpmv(DenseMatrix *InData,
                               CSR *W1, CSR *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp){
         int batchSize = InData->m;

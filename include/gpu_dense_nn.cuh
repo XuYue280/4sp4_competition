@@ -8,8 +8,15 @@
 #ifndef LAB01_GPU_DENSE_NN_CUH
 #define LAB01_GPU_DENSE_NN_CUH
 
+#include "def.h"
+#include <cuda_runtime.h>
+
 namespace swiftware::hpp
 {
+
+    DenseMatrix *dense_nn_gemm_gpu(DenseMatrix *InData, DenseMatrix *W1, DenseMatrix *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp, cudaStream_t stream = 0);
+
+    DenseMatrix *dense_nn_gemv_gpu(DenseMatrix *InData, DenseMatrix *W1, DenseMatrix *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp, cudaStream_t stream = 0);
 
 }
 #endif //LAB01_GPU_DENSE_NN_CUH

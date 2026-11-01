@@ -16,7 +16,7 @@
 namespace swiftware::hpp {
 
     void gemv(int m, int n, const float *A, const float *x, float *y, ScheduleParams Sp) {
-        //TODO Implement GEMV: y = A * x + y
+        // TODO: IMPLEMENT THIS: y = A * x + y
     }
 
 

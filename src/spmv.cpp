@@ -9,7 +9,7 @@
 
 namespace swiftware::hpp {
   void spmvCSR(int m, int n, const int *Ap, const int *Ai, const float *Ax, const float *b, float *c, ScheduleParams Sp){
-    // TODO Implement SPMV: c = A * b + c
+    // TODO: IMPLEMENT THIS: c = A * b + c
   }
 
 

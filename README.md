@@ -85,10 +85,10 @@ the job will be saved in a `*.out` file.
 Deep neural networks (DNN) consist of multiple layers that perform matrix multiplications
 followed by nonlinear operations.
 In each layer, the input is multiplied by a weight matrix and then passed through a
-nonlinear activation function (for example, softmax).
+nonlinear activation function (tanh on the hidden layer, sigmoid on the output layer).
 The output of a layer becomes the input to the next layer.
 Matrix multiplication is the most computationally expensive operation in neural networks.
-Your main task is to implement a three-layer neural network.
+Your main task is to implement a two-layer neural network.
 Implement both dense and sparse variants of the network and compare their accuracy
 and performance against state-of-the-art implementations.
 
@@ -113,11 +113,11 @@ Let's denote:
 
 `H:` Hidden layer activations (h-dimensional)
 
-`Z:` Output vector before softmax (m-dimensional)
+`Z:` Output vector after sigmoid (m-dimensional)
 
-`Y:` Output vector (m-dimensional)
+`Y:` Predicted class index
 
-The forward pass of a DNN with two layers and softmax can be represented as follows:
+The forward pass of a DNN with two layers can be represented as follows:
 
 `H = tanh(X * W1^T + b1)`
 
@@ -140,7 +140,7 @@ Explanation:
 
 *Hidden Layer:* The input is multiplied by the weights of the first layer, and the biases are added. The result is passed through the tanh activation function.
 
-*Output Layer:* The activations from the hidden layer are multiplied by the weights of the second layer, and the biases are added. The result is passed through the sigmoid activation function to normalize the outputs into a probability distribution.
+*Output Layer:* The activations from the hidden layer are multiplied by the weights of the second layer, and the biases are added. The result is passed through the sigmoid activation function, which maps each component into (0, 1). Sigmoid does not make the components sum to 1.
 
 *Prediction:* Eventually argmax is used to predict the class label based on the output vector Z.
 
@@ -151,7 +151,7 @@ server when you run the provided `build_run.sh` script. See that script for deta
 All model parameters are stored as CSV files in the `data/model/` folder.
 The MNIST dataset is also provided in the `data` folder as a CSV file.
 Functions for reading these CSV files are provided.
-The MNIST CSV contains features and labels; labels are located in the first column after loading.
+The MNIST CSV contains features and labels. After the header row is removed, column 0 is the label and the remaining columns are pixel values, which must be divided by 255 before the forward pass. The C++ network returns one class index per row, from `argmax` of `Z`.
 
 **Note:** The code assumes the data is in the `data` folder. If you set up the project in a
 different location than the server, update the paths accordingly.
@@ -191,7 +191,7 @@ optimizations such as memory coalescing, tiling/shared memory, warp-level primit
 asynchronous copies, and tensor cores where applicable.
 Then build the dense and sparse neural networks using these kernels and compare their performance on the GPU.
 
-**Important Note** To enable GPU in the project, you will need to use `-DGPU_ENABLED=ON` when calling CMake.
+**Important Note** `build_run.sh` already passes `-DGPU_ENABLED=ON`. A manual CMake run needs that same flag.
 
 ### Bonus Task: New Pruning Method and Outperforming vendor libraries
 * Implement a new pruning method that outperforms magnitude-based pruning in terms of performance while maintaining
@@ -257,7 +257,7 @@ Typically, there is no single correct answer/plot for the following questions. R
 
 ### Plot(s) 1: CPU MM/MV and SpMV/SpMM performance analysis
 
-![Figure 1: Standard Sort Algorithm Complexity](plots/plot1.png)
+![Figure 1: CPU MM/MV and SpMV/SpMM performance](plots/plot1.png)
 
 Description: TODO: please provide details what each
 value in above plot means and how you draw a conclusion from it

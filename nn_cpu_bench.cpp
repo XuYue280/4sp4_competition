@@ -8,86 +8,214 @@
 #include "benchmark/benchmark.h"
 #include "utils.h"
 #include "dense_nn.h"
-#include <iostream>
+#include "sparse_nn.h"
 
+#include <string>
 
-static void BM_DENSENN(benchmark::State &state) {
-    auto *mnistData = swiftware::hpp::readCSV("./data/mnist_train.csv", true);
-    auto *labels = new swiftware::hpp::DenseMatrix(mnistData->m, 1);
-    auto *features = new swiftware::hpp::DenseMatrix(mnistData->m, mnistData->n - 1);
+namespace {
 
-    //TODO: Extract labels and features from mnist dataset
+struct MnistSplit {
+    swiftware::hpp::DenseMatrix *raw;
+    swiftware::hpp::DenseMatrix *labels;
+    swiftware::hpp::DenseMatrix *features;
 
-    auto *weightsOutput = swiftware::hpp::readCSV("./data/model/weights_output.csv");
-    auto *weightsHidden = swiftware::hpp::readCSV("./data/model/weights_hidden.csv");
-    auto *biasesHidden = swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
-    auto *biasesOutput = swiftware::hpp::readCSV("./data/model/biases_output.csv");
-    swiftware::hpp::ScheduleParams scheduleParams(state.range(0), state.range(1));
+    MnistSplit() {
+        raw = swiftware::hpp::readCSV("./data/mnist_train.csv", true);
+        labels = new swiftware::hpp::DenseMatrix(raw->m, 1);
+        features = new swiftware::hpp::DenseMatrix(raw->m, raw->n - 1);
+        // TODO: IMPLEMENT THIS
+        // column 0 is the label; the other columns are pixels divided by 255
+    }
 
-    //TODO : Implement the benchmark
-    int correctPredictions = 0;
+    ~MnistSplit() {
+        delete raw;
+        delete labels;
+        delete features;
+    }
+};
+
+}
+
+static void BM_DENSENN_GEMM(benchmark::State &state) {
+    MnistSplit mnist;
+    auto *w1 = swiftware::hpp::readCSV("./data/model/weights_hidden.csv");
+    auto *w2 = swiftware::hpp::readCSV("./data/model/weights_output.csv");
+    auto *b1 = swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
+    auto *b2 = swiftware::hpp::readCSV("./data/model/biases_output.csv");
+    swiftware::hpp::ScheduleParams sp(state.range(0), state.range(1));
 
     for (auto _: state) {
-        // Running the NN function
-
-        // TODO: Calculate accuracy
+        auto *pred = swiftware::hpp::dense_nn_gemm(mnist.features, w1, w2, b1, b2, sp);
         state.PauseTiming();
-
-        //state.counters["Accuracy"] = accuracy;
-
+        // TODO: IMPLEMENT THIS
+        delete pred;
         state.ResumeTiming();
     }
 
-    delete mnistData;
-    delete labels;
-    delete features;
-    delete weightsOutput;
-    delete weightsHidden;
-    delete biasesHidden;
-    delete biasesOutput;
+    delete w1;
+    delete w2;
+    delete b1;
+    delete b2;
 }
 
-
-
-static void BM_SPARSENN(benchmark::State &state) {
-    auto *mnistData = swiftware::hpp::readCSV("./data/mnist_train.csv", true);
-    auto *labels = new swiftware::hpp::DenseMatrix(mnistData->m, 1);
-    auto *features = new swiftware::hpp::DenseMatrix(mnistData->m, mnistData->n - 1);
-
-    //TODO: Extract labels and features from mnist dataset
-
-
-    // TODO : load sparse weights and convert to CSR format
-
-    //TODO : Implement the benchmark
-    int correctPredictions = 0;
+static void BM_DENSENN_GEMV(benchmark::State &state) {
+    MnistSplit mnist;
+    auto *w1 = swiftware::hpp::readCSV("./data/model/weights_hidden.csv");
+    auto *w2 = swiftware::hpp::readCSV("./data/model/weights_output.csv");
+    auto *b1 = swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
+    auto *b2 = swiftware::hpp::readCSV("./data/model/biases_output.csv");
+    swiftware::hpp::ScheduleParams sp(state.range(0), state.range(1));
 
     for (auto _: state) {
-        //TODO Running the NN function
-
-        // TODO: Calculate accuracy
+        auto *pred = swiftware::hpp::dense_nn_gemv(mnist.features, w1, w2, b1, b2, sp);
         state.PauseTiming();
-
-
-
-
+        // TODO: IMPLEMENT THIS
+        delete pred;
         state.ResumeTiming();
     }
 
-    delete mnistData;
-    delete labels;
-    delete features;
+    delete w1;
+    delete w2;
+    delete b1;
+    delete b2;
 }
 
+static void BM_SPARSENN_SPMM(benchmark::State &state) {
+    MnistSplit mnist;
+    std::string prefix = "./data/model/" + std::to_string(state.range(0));
+    auto *w1Dense = swiftware::hpp::readCSV(prefix + "_W1.csv");
+    auto *w2Dense = swiftware::hpp::readCSV(prefix + "_W2.csv");
+    auto *w1 = swiftware::hpp::denseToCSR(w1Dense);
+    auto *w2 = swiftware::hpp::denseToCSR(w2Dense);
+    auto *b1 = swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
+    auto *b2 = swiftware::hpp::readCSV("./data/model/biases_output.csv");
+    swiftware::hpp::ScheduleParams sp(-1, -1);
 
-// For baseline and simd where tile sizes are not used
-BENCHMARK(BM_DENSENN)
+    for (auto _: state) {
+        auto *pred = swiftware::hpp::sparseNNSpmm(mnist.features, w1, w2, b1, b2, sp);
+        state.PauseTiming();
+        // TODO: IMPLEMENT THIS
+        delete pred;
+        state.ResumeTiming();
+    }
+
+    delete w1Dense;
+    delete w2Dense;
+    delete w1;
+    delete w2;
+    delete b1;
+    delete b2;
+}
+
+static void BM_SPARSENN_SPMV(benchmark::State &state) {
+    MnistSplit mnist;
+    std::string prefix = "./data/model/" + std::to_string(state.range(0));
+    auto *w1Dense = swiftware::hpp::readCSV(prefix + "_W1.csv");
+    auto *w2Dense = swiftware::hpp::readCSV(prefix + "_W2.csv");
+    auto *w1 = swiftware::hpp::denseToCSR(w1Dense);
+    auto *w2 = swiftware::hpp::denseToCSR(w2Dense);
+    auto *b1 = swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
+    auto *b2 = swiftware::hpp::readCSV("./data/model/biases_output.csv");
+    swiftware::hpp::ScheduleParams sp(-1, -1);
+
+    for (auto _: state) {
+        auto *pred = swiftware::hpp::sparseNNSpmv(mnist.features, w1, w2, b1, b2, sp);
+        state.PauseTiming();
+        // TODO: IMPLEMENT THIS
+        delete pred;
+        state.ResumeTiming();
+    }
+
+    delete w1Dense;
+    delete w2Dense;
+    delete w1;
+    delete w2;
+    delete b1;
+    delete b2;
+}
+
+#ifdef USE_MKL
+static void BM_DENSENN_MKL_GEMM(benchmark::State &state) {
+    MnistSplit mnist;
+    auto *w1 = swiftware::hpp::readCSV("./data/model/weights_hidden.csv");
+    auto *w2 = swiftware::hpp::readCSV("./data/model/weights_output.csv");
+    auto *b1 = swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
+    auto *b2 = swiftware::hpp::readCSV("./data/model/biases_output.csv");
+    swiftware::hpp::ScheduleParams sp(state.range(0), state.range(1));
+
+    for (auto _: state) {
+        auto *pred = swiftware::hpp::dense_nn_mkl_gemm(mnist.features, w1, w2, b1, b2, sp);
+        state.PauseTiming();
+        // TODO: IMPLEMENT THIS
+        delete pred;
+        state.ResumeTiming();
+    }
+
+    delete w1;
+    delete w2;
+    delete b1;
+    delete b2;
+}
+
+static void BM_DENSENN_MKL_GEMV(benchmark::State &state) {
+    MnistSplit mnist;
+    auto *w1 = swiftware::hpp::readCSV("./data/model/weights_hidden.csv");
+    auto *w2 = swiftware::hpp::readCSV("./data/model/weights_output.csv");
+    auto *b1 = swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
+    auto *b2 = swiftware::hpp::readCSV("./data/model/biases_output.csv");
+    swiftware::hpp::ScheduleParams sp(state.range(0), state.range(1));
+
+    for (auto _: state) {
+        auto *pred = swiftware::hpp::dense_nn_mkl_gemv(mnist.features, w1, w2, b1, b2, sp);
+        state.PauseTiming();
+        // TODO: IMPLEMENT THIS
+        delete pred;
+        state.ResumeTiming();
+    }
+
+    delete w1;
+    delete w2;
+    delete b1;
+    delete b2;
+}
+#endif
+
+BENCHMARK(BM_DENSENN_GEMM)
     ->Args({-1, -1})
     ->Unit(benchmark::kMillisecond)
     ->Iterations(1)
-    ->Repetitions(5);
+    ->Repetitions(1);
 
+BENCHMARK(BM_DENSENN_GEMV)
+    ->Args({-1, -1})
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(1)
+    ->Repetitions(1);
 
+BENCHMARK(BM_SPARSENN_SPMM)
+    ->DenseRange(50, 95, 5)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(1)
+    ->Repetitions(1);
 
+BENCHMARK(BM_SPARSENN_SPMV)
+    ->DenseRange(50, 95, 5)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(1)
+    ->Repetitions(1);
+
+#ifdef USE_MKL
+BENCHMARK(BM_DENSENN_MKL_GEMM)
+    ->Args({-1, -1})
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(1)
+    ->Repetitions(1);
+
+BENCHMARK(BM_DENSENN_MKL_GEMV)
+    ->Args({-1, -1})
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(1)
+    ->Repetitions(1);
+#endif
 
 BENCHMARK_MAIN();

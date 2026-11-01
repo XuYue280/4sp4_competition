@@ -9,8 +9,15 @@
 #ifndef LAB01_GPU_SPARSE_NN_CUH
 #define LAB01_GPU_SPARSE_NN_CUH
 
+#include "sparse_nn.h"
+#include <cuda_runtime.h>
+
 namespace swiftware::hpp
 {
+
+    DenseMatrix *sparse_nn_spmm_gpu(DenseMatrix *InData, CSR *W1, CSR *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp, cudaStream_t stream = 0);
+
+    DenseMatrix *sparse_nn_spmv_gpu(DenseMatrix *InData, CSR *W1, CSR *W2, DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp, cudaStream_t stream = 0);
 
 }
 

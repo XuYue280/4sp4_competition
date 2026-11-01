@@ -27,8 +27,8 @@ namespace swiftware::hpp {
         auto *W1 = new CSR(hiddenSize, inputSize, hiddenSize);
         auto *W2 = new CSR(outputSize, hiddenSize, outputSize);
 
-        auto *B1 = new DenseMatrix(batchSize, hiddenSize);
-        auto *B2 = new DenseMatrix(batchSize, outputSize);
+        auto *B1 = new DenseMatrix(hiddenSize, 1);
+        auto *B2 = new DenseMatrix(outputSize, 1);
 
         // Initialize with small values
         for (int i = 0; i < InData->m * InData->n; ++i) InData->data[i] = 0.1f;

@@ -11,7 +11,7 @@
 namespace swiftware::hpp {
 
   void spmmCSR(int m, int n, int k, const int *Ap, const int *Ai, const float *Ax, const float *B, float *C, ScheduleParams Sp) {
-    // TODO Implement SPMM: C = A * B + C
+    // TODO: IMPLEMENT THIS: C = A * B + C
   }
 
 }

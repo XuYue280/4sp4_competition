@@ -9,12 +9,9 @@
 
 #include <string>
 #include "def.h"
+#include "sparse_nn.h"
 
 namespace swiftware::hpp {
-
- //TODO add necessary includes
-
-
 
  // Do not change the following function signatures
  /// \brief Read a CSV file and store it in a DenseMatrix
@@ -23,8 +20,10 @@ namespace swiftware::hpp {
  /// \param removeFirstRow Whether to remove the first row of the CSV file
  DenseMatrix * readCSV(const std::string &filename, bool removeFirstRow = false);
 
-
-
+ /// \brief Convert a dense matrix to CSR format
+ /// \param dense The dense matrix to convert
+ /// \return CSR sparse matrix
+ CSR * denseToCSR(DenseMatrix *dense);
 
 }
 

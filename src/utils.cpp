@@ -13,8 +13,6 @@
 
 namespace swiftware::hpp {
 
-    //TODO add necessary includes
-
     // Do not change the following function signatures
     DenseMatrix *readCSV(const std::string &filename, bool removeFirstRow) {
         std::ifstream file(filename);
@@ -45,6 +43,11 @@ namespace swiftware::hpp {
             }
         }
         return OutMat;
+    }
+
+    CSR *denseToCSR(DenseMatrix *dense) {
+        // TODO: IMPLEMENT THIS
+        return new CSR(dense->m, dense->n, 0);
     }
 
 

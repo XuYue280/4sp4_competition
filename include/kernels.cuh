@@ -8,37 +8,18 @@
 #ifndef PROJECT_KERNELS_CUH
 #define PROJECT_KERNELS_CUH
 
+#include <cuda_runtime.h>
 
 namespace swiftware::hpp
 {
 
-    // GEMM kernel
-    __global__ void MM(const float* a, const float* b, float* result, int m, int n, int k)
-    {
-        // TODO
-    }
+    __global__ void GEMM(const float* a, const float* b, float* result, int m, int n, int k);
 
-    // GEMV
-    __global__ void MV(const float* a, const float* b, float* result, int m, int n)
-    {
-        // TODO
-    }
+    __global__ void GEMV(const float* a, const float* b, float* result, int m, int n);
 
-    // SpMM
-    __global__ void SpMM(int *row_ptr, int *col_id, const float* a, const float* b, float* result, int m, int n, int k)
-    {
-        // TODO
-    }
+    __global__ void SpMM(int *row_ptr, int *col_id, const float* a, const float* b, float* result, int m, int n, int k);
 
-    // SpMV
-    __global__ void SpMV(int *row_ptr, int *col_id, const float* a, const float* b, float* result, int m, int n)
-    {
-        // TODO
-    }
-
-
-
-
+    __global__ void SpMV(int *row_ptr, int *col_id, const float* a, const float* b, float* result, int m, int n);
 
 }
 #endif //PROJECT_KERNELS_CUH

@@ -1,0 +1,10 @@
+data/
+logs/
+plots/
+build/
+venv/
+*.out
+.idea/
+cmake-build-debug/
+cmake-build-release/
+compile_commands.json
