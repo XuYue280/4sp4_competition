@@ -9,9 +9,21 @@
 
 #include <string>
 #include "def.h"
-#include "sparse_nn.h"
 
 namespace swiftware::hpp {
+
+  // CSR sparse matrix format
+  struct CSR {
+    int m;           // number of rows
+    int n;           // number of columns
+    int nnz;         // number of non-zero elements
+    std::vector<int> row_ptr;    // row pointers (size m+1)
+    std::vector<int> col_idx;    // column indices (size nnz)
+    std::vector<float> values;   // non-zero values (size nnz)
+
+    CSR(int m, int n, int nnz) : m(m), n(n), nnz(nnz),
+        row_ptr(m+1, 0), col_idx(nnz), values(nnz) {}
+  };
 
  // Do not change the following function signatures
  /// \brief Read a CSV file and store it in a DenseMatrix

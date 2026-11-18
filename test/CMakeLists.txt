@@ -37,27 +37,6 @@ if(USE_MKL)
     target_compile_definitions(project_gemv_test PRIVATE USE_MKL)
 endif()
 
-add_executable( project_dense_nn_test
-        denseNN_test.cpp
-        ${CMAKE_SOURCE_DIR}/src/dense_nn.cpp
-        ${CMAKE_SOURCE_DIR}/src/gemm.cpp
-        ${CMAKE_SOURCE_DIR}/src/gemv.cpp
-        ${CMAKE_SOURCE_DIR}/src/utils.cpp
-        )
-target_compile_options(project_dense_nn_test PRIVATE -mavx2 -mfma -march=native)
-target_link_libraries( project_dense_nn_test
-        PRIVATE
-        GTest::gtest_main
-        )
-if(OPENMP)
-    target_link_libraries(project_dense_nn_test PRIVATE OpenMP::OpenMP_CXX)
-endif()
-if(USE_MKL)
-    target_link_libraries(project_dense_nn_test PRIVATE MKL::MKL)
-    target_compile_definitions(project_dense_nn_test PRIVATE USE_MKL)
-endif()
-
-# TODO: Add sparse NN tests
 add_executable( project_spmv_test
         spmv_test.cpp
         ${CMAKE_SOURCE_DIR}/src/spmv.cpp
@@ -69,6 +48,10 @@ target_link_libraries( project_spmv_test
         )
 if(OPENMP)
     target_link_libraries(project_spmv_test PRIVATE OpenMP::OpenMP_CXX)
+endif()
+if(USE_MKL)
+    target_link_libraries(project_spmv_test PRIVATE MKL::MKL)
+    target_compile_definitions(project_spmv_test PRIVATE USE_MKL)
 endif()
 
 add_executable( project_spmm_test
@@ -83,27 +66,13 @@ target_link_libraries( project_spmm_test
 if(OPENMP)
     target_link_libraries(project_spmm_test PRIVATE OpenMP::OpenMP_CXX)
 endif()
-
-add_executable( project_sparse_nn_test
-        sparseNN_test.cpp
-        ${CMAKE_SOURCE_DIR}/src/sparse_nn.cpp
-        ${CMAKE_SOURCE_DIR}/src/spmm.cpp
-        ${CMAKE_SOURCE_DIR}/src/spmv.cpp
-        ${CMAKE_SOURCE_DIR}/src/utils.cpp
-        )
-target_compile_options(project_sparse_nn_test PRIVATE -mavx2 -mfma -march=native)
-target_link_libraries( project_sparse_nn_test
-        PRIVATE
-        GTest::gtest_main
-        )
-if(OPENMP)
-    target_link_libraries(project_sparse_nn_test PRIVATE OpenMP::OpenMP_CXX)
+if(USE_MKL)
+    target_link_libraries(project_spmm_test PRIVATE MKL::MKL)
+    target_compile_definitions(project_spmm_test PRIVATE USE_MKL)
 endif()
 
 include(GoogleTest)
 gtest_discover_tests(project_gemm_test)
 gtest_discover_tests(project_gemv_test)
-gtest_discover_tests(project_dense_nn_test)
 gtest_discover_tests(project_spmv_test)
 gtest_discover_tests(project_spmm_test)
-gtest_discover_tests(project_sparse_nn_test)

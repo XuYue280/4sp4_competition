@@ -47,9 +47,6 @@ $(pwd)/build/project --benchmark_out="$(pwd)/logs/project.json" --benchmark_out_
 echo "Computing speedup metrics for CPU kernels..."
 python3 $(pwd)/script/compute_speedup.py $(pwd)/logs/project.json $(pwd)/logs/cpu_speedup_report.txt
 
-echo "Running NN CPU benchmarks..."
-$(pwd)/build/nn_cpu --benchmark_out="$(pwd)/logs/nn_cpu.json" --benchmark_out_format=json
-
 
 echo "---- Running GPU Benchmarks ----"
 
@@ -59,13 +56,13 @@ $(pwd)/build/project_gpu --json "$(pwd)/logs/project_gpu.json"
 echo "Computing speedup metrics for GPU kernels..."
 python3 $(pwd)/script/compute_speedup.py $(pwd)/logs/project_gpu.json $(pwd)/logs/gpu_speedup_report.txt
 
-echo "Running NN GPU benchmarks..."
-$(pwd)/build/nn_gpu --json "$(pwd)/logs/nn_gpu.json"
-
 
 echo "---- Running Tests ----"
 
-$(pwd)/build/test/project_dense_nn_test
+$(pwd)/build/test/project_gemm_test
+$(pwd)/build/test/project_gemv_test
+$(pwd)/build/test/project_spmm_test
+$(pwd)/build/test/project_spmv_test
 
 
 echo "---- Plotting ----"

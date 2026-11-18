@@ -41,6 +41,8 @@ endif()
 # Find Intel MKL
 option(USE_MKL "Use Intel MKL for reference implementations" ON)
 if(USE_MKL)
+    # LP64 interface so MKL_INT matches the 32-bit int CSR arrays used by spmmCSR/spmvCSR
+    set(MKL_INTERFACE lp64)
     find_package(MKL CONFIG REQUIRED)
     message(STATUS "MKL found: ${MKL_ROOT}")
 endif()
@@ -124,8 +126,11 @@ if(GPU_ENABLED)
                 main_bench.cu
                 src/kernels.cu)
 
+        find_package(CUDAToolkit REQUIRED)
         target_link_libraries(project_gpu
-                nvbench::main)
+                nvbench::main
+                CUDA::cublas
+                CUDA::cusparse)
 
     else()
         message(STATUS "CUDA compiler not found; GPU executables will not be built")
