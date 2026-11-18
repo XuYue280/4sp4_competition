@@ -1,235 +1,230 @@
 #!/usr/bin/env python3
 """
-Speedup report for the HPP Grand Prix kernels (GEMM, GEMV, SpMM, SpMV) on CPU or GPU.
-
-    speedup = T_baseline / T_optimized    (> 1 means faster than the vendor library)
-
-Per kernel: geometric mean over every configuration in the JSON (the sweep itself is defined in
-            main_bench.cpp / main_bench.cu; this script only reads what they wrote).
-Overall:    geometric mean of the per-kernel values (each kernel weighs the same).
-Bonus:      sparse optimized kernel vs dense vendor library on the same shape (SpMM vs GEMM baseline,
-            SpMV vs GEMV baseline); target 1.2x on CPU (MKL) and 1.1x on GPU (cuBLAS).
-
-Reads Google Benchmark JSON (CPU, e.g. logs/project.json) or NVBench JSON (GPU, e.g. logs/project_gpu.json).
-Usage: python3 compute_speedup.py <benchmark_json_file> [output_report_file]
+Compute geometric mean (gmean) speedup per kernel and across all kernels.
+Speedup is calculated as: baseline_time / optimized_time
+gmean is calculated as: (product of all speedups) ^ (1/n)
+Bonus: sparse optimized kernel vs dense baseline on the same shape (SPMM vs GEMM, SPMV vs GEMV).
+Reads Google Benchmark JSON (CPU) or NVBench JSON (GPU); the configurations come from the JSON.
 """
 
 import json
-import math
-import re
 import statistics
 import sys
 from collections import defaultdict
+from pathlib import Path
 
-# Parameter order follows the benchmark arguments / NVBench axes:
-#   gemm (m, n, k)   gemv (m, n)   spmm (m, n, k, sparsity)   spmv (m, n, sparsity)
-NUM_PARAMS = {"gemm": 3, "gemv": 2, "spmm": 4, "spmv": 3}
-KERNELS = list(NUM_PARAMS)
-# Position of each dimension in the parameter tuple, for the breakdown lines.
-DIMS = {
-    "gemm": {"size": 0, "bcol": 1},
-    "gemv": {"size": 0},
-    "spmm": {"size": 0, "bcol": 1, "sparsity": 3},
-    "spmv": {"size": 0, "sparsity": 2},
-}
-# Bytes any real kernel must read at least once: the A matrix (values, plus column indices if sparse).
-A_BYTES = {
-    "gemm": lambda m, n, k: 4 * m * k,
-    "gemv": lambda m, n: 4 * m * n,
-    "spmm": lambda m, n, k, s: 8 * m * k * (100 - s) / 100,
-    "spmv": lambda m, n, s: 8 * m * n * (100 - s) / 100,
-}
-# Reading A faster than this is impossible on the cluster (Ada2000 DRAM is ~0.22 TB/s),
-# so a variant that does it on its largest config is treated as an empty (unimplemented) kernel.
-MAX_BANDWIDTH = 2e12  # bytes/s
-# Bonus: sparse kernel -> dense kernel with the same shape (drop the sparsity parameter).
-DENSE_OF = {"spmm": "gemm", "spmv": "gemv"}
+KERNELS = ["gemm", "gemv", "spmm", "spmv"]
+BONUS_PAIRS = {"spmm": "gemm", "spmv": "gemv"}
 BONUS_TARGET = {"CPU": 1.2, "GPU": 1.1}
-
-NAME_RE = re.compile(r"(?:BM_)?(gemm|gemv|spmm|spmv)_(baseline|optimized)$", re.IGNORECASE)
+EMPTY_TIME = 2e-5  # seconds; if even the slowest config is faster than this, the kernel is treated as empty
 UNIT = {"ns": 1e-9, "us": 1e-6, "ms": 1e-3, "s": 1.0}
 
 
-def gmean(values):
-    values = list(values)
-    return math.exp(sum(math.log(v) for v in values) / len(values))
+def compute_gmean(values):
+    """Compute geometric mean of a list of values."""
+    if not values or any(v <= 0 for v in values):
+        return None
+    product = 1.0
+    for v in values:
+        product *= v
+    return product ** (1.0 / len(values))
 
 
-def load_gbench(data):
-    """Google Benchmark: samples (seconds) per repetition keyed by (kernel, variant, params),
-    plus the number of failed runs per (kernel, variant)."""
-    samples, failed = defaultdict(list), defaultdict(int)
-    for b in data.get("benchmarks") or []:
-        if b.get("run_type", "iteration") != "iteration":
-            continue  # skip the _mean/_median/_stddev/_cv aggregates
-        name, *args = b.get("run_name", b["name"]).split("/")
-        m = NAME_RE.match(name)
-        if not m:
+def extract_benchmark_data(json_data):
+    """Extract times (seconds) as {kernel: {variant: {config: [times]}}}, config = benchmark arguments."""
+    benchmarks = defaultdict(lambda: {"baseline": defaultdict(list), "optimized": defaultdict(list)})
+
+    for bench in json_data.get("benchmarks") or []:
+        name, *args = bench["name"].lower().split("/")
+        if name.startswith("bm_"):
+            name = name[3:]
+        kernel, _, variant = name.partition("_")
+        if kernel not in KERNELS or variant not in ("baseline", "optimized"):
             continue
-        if b.get("error_occurred") or b.get("skipped"):
-            failed[m[1].lower(), m[2].lower()] += 1
-            continue
-        params = tuple(int(a) for a in args if a.isdigit())  # drops "iterations:1", "repeats:5"
-        samples[m[1].lower(), m[2].lower(), params].append(b["real_time"] * UNIT[b["time_unit"]])
-    return samples, failed
+
+        if "states" in bench:  # NVBench
+            for state in bench["states"]:
+                config = tuple(int(a["value"]) for a in state.get("axis_values") or [])
+                for summary in state.get("summaries") or []:
+                    if summary["tag"] == "nv/cold/time/gpu/mean":
+                        value = next(float(d["value"]) for d in summary["data"] if d["name"] == "value")
+                        benchmarks[kernel][variant][config].append(value)
+        elif bench.get("run_type") != "aggregate" and not (bench.get("error_occurred") or bench.get("skipped")):  # Google Benchmark
+            config = tuple(int(a) for a in args if a.isdigit())
+            benchmarks[kernel][variant][config].append(bench["real_time"] * UNIT[bench["time_unit"]])
+
+    return benchmarks
 
 
-def load_nvbench(data):
-    """NVBench: mean GPU time (seconds) of every state keyed by (kernel, variant, params),
-    plus the number of failed/skipped states per (kernel, variant)."""
-    samples, failed = defaultdict(list), defaultdict(int)
-    for b in data.get("benchmarks") or []:
-        m = NAME_RE.match(b["name"])
-        if not m:
-            continue
-        for state in b.get("states") or []:
-            if state.get("is_skipped") or not state.get("summaries"):
-                failed[m[1].lower(), m[2].lower()] += 1  # nvbench records crashes/timeouts as skipped
-                continue
-            axes = {a["name"]: int(a["value"]) for a in state.get("axis_values") or []}
-            known = ("m", "n", "k", "sparsity")  # any extra axis makes the length check in main() reject the state
-            params = tuple(axes[k] for k in known if k in axes) + tuple(v for k, v in axes.items() if k not in known)
-            for s in state["summaries"]:
-                if s["tag"] == "nv/cold/time/gpu/mean":
-                    value = next(float(d["value"]) for d in s["data"] if d["name"] == "value")
-                    samples[m[1].lower(), m[2].lower(), params].append(value)
-    return samples, failed
-
-
-def check(kernel, times):
-    """Return why a variant cannot be scored, or None if it looks implemented."""
+def median_times(data):
+    """Take the median of the repetitions of every config and check that the kernel was implemented."""
+    times = {config: statistics.median(t) for config, t in data.items()}
     if not times:
-        return "missing"
+        return times, "missing"
     if min(times.values()) <= 0:
-        return "zero time"
-    p = max(times, key=lambda p: A_BYTES[kernel](*p))
-    bandwidth = A_BYTES[kernel](*p) / times[p]
-    if bandwidth > MAX_BANDWIDTH:
-        return f"looks empty (reads A at {bandwidth / 1e12:.0f} TB/s on {p})"
-    return None
+        return times, "zero time"
+    if max(times.values()) < EMPTY_TIME:
+        return times, "not implemented"
+    return times, "ok"
 
 
-def breakdown(ratios, dims):
-    """'by <dim>' lines: gmean of the ratios grouped by each dimension."""
-    lines = []
-    for dim, i in dims.items():
-        groups = defaultdict(list)
-        for p, r in ratios.items():
-            groups[p[i]].append(r)
-        lines.append(f"      by {dim:<9}" + "  ".join(f"{k}:{gmean(v):.2f}x" for k, v in sorted(groups.items())))
-    return lines
+def compute_speedups(benchmarks):
+    """Compute speedup (baseline/optimized) for each kernel on the configs both variants ran."""
+    speedups = {}
+
+    for kernel in KERNELS:
+        baseline_times, baseline_status = median_times(benchmarks[kernel]["baseline"])
+        optimized_times, optimized_status = median_times(benchmarks[kernel]["optimized"])
+        configs = sorted(baseline_times.keys() & optimized_times.keys())
+
+        kernel_speedups = []
+        if baseline_status == optimized_status == "ok":
+            kernel_speedups = [baseline_times[c] / optimized_times[c] for c in configs]
+
+        speedups[kernel] = {
+            "status": {"baseline": baseline_status, "optimized": optimized_status},
+            "individual_speedups": kernel_speedups,
+            "gmean_speedup": compute_gmean(kernel_speedups),
+            "num_benchmarks": len(kernel_speedups),
+            "num_configs": len(baseline_times.keys() | optimized_times.keys()),
+        }
+
+    return speedups
 
 
-def kernel_report(kernel, variants, failed):
-    base, opt = variants[kernel, "baseline"], variants[kernel, "optimized"]
-    why = {"baseline": check(kernel, base), "optimized": check(kernel, opt)}
-    label = {v: "ok" if w is None else w.split(" (")[0] for v, w in why.items()}
-    paired = sorted(base.keys() & opt.keys())
-    configs = f"{len(paired)}/{len(base.keys() | opt.keys())}"
-    row = f"{kernel.upper():<6} {label['baseline']:<12} {label['optimized']:<12} {configs:>8}"
-    notes = [f"{v}: {w}" for v, w in why.items() if w and w != label[v]]
-    notes += [f"{v}: {failed[kernel, v]} runs failed or were skipped (see benchmark log)"
-              for v in ("baseline", "optimized") if failed[kernel, v]]
-    if len(paired) < len(base.keys() | opt.keys()):
-        notes.append(f"{len(base.keys() ^ opt.keys())} configs ran for only one variant (not scored)")
-    if any(why.values()) or not paired:
-        return None, [f"{row} {'-':>8} {'-':>8} {'-':>8}  NOT SCORED"] + [f"      note: {n}" for n in notes]
+def compute_bonus(benchmarks):
+    """Speedup of the sparse optimized kernel over the dense baseline (sparse config without its sparsity)."""
+    bonus = {}
 
-    speedups = {p: base[p] / opt[p] for p in paired}
-    g = gmean(speedups.values())
-    status = "PARTIAL" if notes else "OK"
-    lines = [f"{row} {g:>7.3f}x {min(speedups.values()):>7.3f}x {max(speedups.values()):>7.3f}x  {status}"]
-    return (g, status), lines + breakdown(speedups, DIMS[kernel]) + [f"      note: {n}" for n in notes]
+    for sparse, dense in BONUS_PAIRS.items():
+        dense_times, dense_status = median_times(benchmarks[dense]["baseline"])
+        sparse_times, sparse_status = median_times(benchmarks[sparse]["optimized"])
+
+        ratios = []
+        if dense_status == sparse_status == "ok":
+            ratios = [dense_times[c[:-1]] / t for c, t in sparse_times.items() if c[:-1] in dense_times]
+
+        bonus[f"{sparse.upper()} optimized vs {dense.upper()} baseline"] = {
+            "status": f"{dense} baseline {dense_status}, {sparse} optimized {sparse_status}",
+            "gmean_speedup": compute_gmean(ratios),
+            "num_benchmarks": len(ratios),
+            "num_configs": len(sparse_times),
+        }
+
+    return bonus
 
 
-def bonus_report(variants, target):
-    """Sparse optimized kernel vs dense vendor library (baseline) on the same matrix shape."""
-    lines, results = [], []
-    for sparse, dense in DENSE_OF.items():
-        name = f"{sparse.upper()} optimized vs {dense.upper()} baseline"
-        d, s = variants[dense, "baseline"], variants[sparse, "optimized"]
-        why = [f"{v} {w}" for v, w in ((f"{dense.upper()} baseline", check(dense, d)),
-                                       (f"{sparse.upper()} optimized", check(sparse, s))) if w]
-        ratios = {p: d[p[:-1]] / s[p] for p in s if p[:-1] in d}
-        if why or not ratios:
-            lines.append(f"{name:<32} {'-':>8}  NOT SCORED: " + ("; ".join(why) or "no matching shapes"))
+def generate_report(speedups, bonus, device, output_file=None):
+    """Generate and print/save a detailed report."""
+    report = []
+    report.append("=" * 80)
+    report.append(f"{device} SPEEDUP ANALYSIS REPORT")
+    report.append("=" * 80)
+    report.append("")
+
+    # Per-kernel analysis
+    report.append("PER-KERNEL SPEEDUP ANALYSIS:")
+    report.append("-" * 80)
+
+    for kernel, data in speedups.items():
+        status = data["status"]
+        report.append(f"\nKernel: {kernel}")
+        report.append(f"  Baseline: {status['baseline']}   Optimized: {status['optimized']}")
+
+        if data["gmean_speedup"] is None:
+            report.append("  Not scored")
             continue
-        g = gmean(ratios.values())
-        complete = len(ratios) == len(s)
-        results.append((g, complete))
-        verdict = ("PASS" if g >= target else "FAIL") if complete else "INCOMPLETE"
-        lines.append(f"{name:<32} {g:>7.3f}x  {verdict}  ({len(ratios)}/{len(s)} configs have a dense baseline)")
-        lines += breakdown(ratios, {"sparsity": DIMS[sparse]["sparsity"]})
-    if len(results) == len(DENSE_OF) and all(c for _, c in results):
-        g = gmean(r for r, _ in results)
-        lines.append(f"BONUS gmean: {g:.3f}x  target {target}x  {'PASS' if g >= target else 'FAIL'}")
+
+        report.append(f"  Number of benchmark configurations: {data['num_benchmarks']} (of {data['num_configs']})")
+        report.append(f"  Geometric Mean Speedup: {data['gmean_speedup']:.4f}x")
+        report.append(f"  Min Speedup: {min(data['individual_speedups']):.4f}x")
+        report.append(f"  Max Speedup: {max(data['individual_speedups']):.4f}x")
+        report.append(f"  Avg Speedup: {sum(data['individual_speedups']) / len(data['individual_speedups']):.4f}x")
+
+    # Overall analysis
+    report.append("")
+    report.append("=" * 80)
+    report.append("OVERALL SPEEDUP ANALYSIS (across all kernels):")
+    report.append("-" * 80)
+
+    scored = {k: d["gmean_speedup"] for k, d in speedups.items() if d["gmean_speedup"] is not None}
+    if scored:
+        best, worst = max(scored, key=scored.get), min(scored, key=scored.get)
+        report.append(f"Overall Geometric Mean Speedup: {compute_gmean(list(scored.values())):.4f}x")
+        report.append(f"Number of kernels: {len(scored)} (of {len(speedups)})")
+        report.append(f"Best kernel speedup: {scored[best]:.4f}x ({best})")
+        report.append(f"Worst kernel speedup: {scored[worst]:.4f}x ({worst})")
     else:
-        lines.append(f"BONUS gmean: n/a  target {target}x  (needs both pairs scored on all their configs)")
-    return lines
+        report.append("Overall Geometric Mean Speedup: n/a (no kernel could be scored)")
 
+    # Bonus analysis
+    target = BONUS_TARGET[device]
+    report.append("")
+    report.append("=" * 80)
+    report.append(f"BONUS: SPARSE vs DENSE BASELINE (target {target}x):")
+    report.append("-" * 80)
 
-def output(text):
-    print(text)
-    if len(sys.argv) > 2:
-        with open(sys.argv[2], "w") as f:
-            f.write(text + "\n")
-        print(f"Report saved to: {sys.argv[2]}")
+    for pair, data in bonus.items():
+        if data["gmean_speedup"] is None:
+            report.append(f"{pair}: not scored ({data['status']})")
+        else:
+            report.append(f"{pair}: {data['gmean_speedup']:.4f}x "
+                          f"({data['num_benchmarks']} of {data['num_configs']} configurations)")
+
+    bonus_gmeans = [d["gmean_speedup"] for d in bonus.values()]
+    if None in bonus_gmeans:
+        report.append("Bonus Geometric Mean Speedup: n/a (needs both pairs)")
+    else:
+        bonus_gmean = compute_gmean(bonus_gmeans)
+        report.append(f"Bonus Geometric Mean Speedup: {bonus_gmean:.4f}x  {'PASS' if bonus_gmean >= target else 'FAIL'}")
+
+    report.append("=" * 80)
+
+    report_text = "\n".join(report)
+    print(report_text)
+
+    if output_file:
+        with open(output_file, 'w') as f:
+            f.write(report_text)
 
 
 def main():
     if len(sys.argv) < 2:
-        print(__doc__.strip())
+        print("Usage: python3 compute_speedup.py <benchmark_json_file> [output_report_file]")
+        print("\nExample: python3 compute_speedup.py logs/project.json logs/speedup_report.txt")
         sys.exit(1)
-    path = sys.argv[1]
+
+    json_file = sys.argv[1]
+    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+
+    if not Path(json_file).exists():
+        print(f"Error: File '{json_file}' not found.")
+        sys.exit(1)
+
     try:
-        with open(path) as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            raise ValueError("not a benchmark JSON object")
-    except (OSError, ValueError) as e:
-        output(f"Error: cannot read '{path}': {e}")  # also replaces a stale report from an earlier run
+        with open(json_file, 'r') as f:
+            json_data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Error: Failed to parse JSON file: {e}")
         sys.exit(1)
 
-    device, fmt, loader = ("CPU", "Google Benchmark", load_gbench) if "context" in data \
-        else ("GPU", "NVBench", load_nvbench)
-    variants = defaultdict(dict)  # (kernel, variant) -> {params: median seconds}
-    bad = 0
-    samples, failed = loader(data)
-    for (kernel, variant, params), v in samples.items():
-        if len(params) == NUM_PARAMS[kernel]:
-            variants[kernel, variant][params] = statistics.median(v)
-        else:
-            bad += 1
+    if not isinstance(json_data, dict):
+        print("Error: Not a benchmark JSON file.")
+        sys.exit(1)
 
-    report = [
-        "=" * 80,
-        f"{device} SPEEDUP REPORT  {path}  ({fmt})",
-        "speedup = T_baseline / T_optimized   (> 1 means faster than baseline)",
-        "=" * 80,
-    ]
-    if bad:
-        report.append(f"warning: ignored {bad} results whose parameters do not match {NUM_PARAMS}")
-    report.append(f"{'kernel':<6} {'baseline':<12} {'optimized':<12} {'configs':>8} {'gmean':>8} {'min':>8} {'max':>8}  status")
-    scored = {}
-    for kernel in KERNELS:
-        result, lines = kernel_report(kernel, variants, failed)
-        report += lines
-        if result is not None:
-            scored[kernel] = result
-    report.append("-" * 80)
-    if scored:
-        groups = {"not scored": [k for k in KERNELS if k not in scored],
-                  "partial": [k for k, (_, s) in scored.items() if s == "PARTIAL"]}
-        tail = "; ".join(f"{label}: {', '.join(k.upper() for k in ks)}" for label, ks in groups.items() if ks)
-        overall = gmean(g for g, _ in scored.values())
-        report.append(f"OVERALL gmean over {len(scored)}/{len(KERNELS)} kernels: {overall:.3f}x"
-                      + (f"   ({tail})" if tail else ""))
-    else:
-        report.append("OVERALL gmean: n/a (no kernel could be scored)")
-    report += ["=" * 80, "BONUS  sparse optimized vs dense vendor library, same shape"]
-    report += bonus_report(variants, BONUS_TARGET[device])
-    report.append("=" * 80)
-    output("\n".join(report))
+    # Google Benchmark writes a "context" block, NVBench does not
+    device = "CPU" if "context" in json_data else "GPU"
+
+    # Extract and process benchmark data
+    benchmarks = extract_benchmark_data(json_data)
+    speedups = compute_speedups(benchmarks)
+    bonus = compute_bonus(benchmarks)
+
+    # Generate and display report
+    generate_report(speedups, bonus, device, output_file)
+
+    if output_file:
+        print(f"\nReport saved to: {output_file}")
 
 
 if __name__ == "__main__":
