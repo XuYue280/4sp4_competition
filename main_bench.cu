@@ -25,7 +25,7 @@ void report_summary(nvbench::state& state)
 void nvbench_gemm_baseline(nvbench::state& state)
 {
     const int m = static_cast<int>(state.get_int64("m"));
-    const int n = static_cast<int>(state.get_int64("n"));
+    const int n = m;
     const int k = static_cast<int>(state.get_int64("k"));
 
     // Allocate device memory
@@ -62,7 +62,7 @@ void nvbench_gemm_baseline(nvbench::state& state)
 void nvbench_gemm_optimized(nvbench::state& state)
 {
     const int m = static_cast<int>(state.get_int64("m"));
-    const int n = static_cast<int>(state.get_int64("n"));
+    const int n = m;
     const int k = static_cast<int>(state.get_int64("k"));
 
     // Allocate device memory
@@ -99,7 +99,7 @@ void nvbench_gemm_optimized(nvbench::state& state)
 void nvbench_gemv_baseline(nvbench::state& state)
 {
     const int m = static_cast<int>(state.get_int64("m"));
-    const int n = static_cast<int>(state.get_int64("n"));
+    const int n = m;
 
     float *d_A, *d_x, *d_y;
     cudaMalloc(&d_A, m * n * sizeof(float));
@@ -133,7 +133,7 @@ void nvbench_gemv_baseline(nvbench::state& state)
 void nvbench_gemv_optimized(nvbench::state& state)
 {
     const int m = static_cast<int>(state.get_int64("m"));
-    const int n = static_cast<int>(state.get_int64("n"));
+    const int n = m;
 
     float *d_A, *d_x, *d_y;
     cudaMalloc(&d_A, m * n * sizeof(float));
@@ -167,7 +167,7 @@ void nvbench_gemv_optimized(nvbench::state& state)
 void nvbench_spmm_baseline(nvbench::state& state)
 {
     const int m = static_cast<int>(state.get_int64("m"));
-    const int n = static_cast<int>(state.get_int64("n"));
+    const int n = m;
     const int k = static_cast<int>(state.get_int64("k"));
     const int sparsity = static_cast<int>(state.get_int64("sparsity"));
 
@@ -230,7 +230,7 @@ void nvbench_spmm_baseline(nvbench::state& state)
 void nvbench_spmm_optimized(nvbench::state& state)
 {
     const int m = static_cast<int>(state.get_int64("m"));
-    const int n = static_cast<int>(state.get_int64("n"));
+    const int n = m;
     const int k = static_cast<int>(state.get_int64("k"));
     const int sparsity = static_cast<int>(state.get_int64("sparsity"));
 
@@ -291,7 +291,7 @@ void nvbench_spmm_optimized(nvbench::state& state)
 void nvbench_spmv_baseline(nvbench::state& state)
 {
     const int m = static_cast<int>(state.get_int64("m"));
-    const int n = static_cast<int>(state.get_int64("n"));
+    const int n = m;
     const int sparsity = static_cast<int>(state.get_int64("sparsity"));
 
     float *d_x, *d_y;
@@ -351,7 +351,7 @@ void nvbench_spmv_baseline(nvbench::state& state)
 void nvbench_spmv_optimized(nvbench::state& state)
 {
     const int m = static_cast<int>(state.get_int64("m"));
-    const int n = static_cast<int>(state.get_int64("n"));
+    const int n = m;
     const int sparsity = static_cast<int>(state.get_int64("sparsity"));
 
     float *d_x, *d_y;
@@ -410,48 +410,40 @@ void nvbench_spmv_optimized(nvbench::state& state)
 
 NVBENCH_BENCH(nvbench_gemm_baseline)
     .set_name("gemm_baseline")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("n", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("k", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */});
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
+    .add_int64_axis("k", {256, 512, 1024, 2048 /*, 4096, 8192, 16384, 32768 */});
 
 NVBENCH_BENCH(nvbench_gemm_optimized)
     .set_name("gemm_optimized")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("n", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("k", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */});
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
+    .add_int64_axis("k", {256, 512, 1024, 2048 /*, 4096, 8192, 16384, 32768 */});
 
 NVBENCH_BENCH(nvbench_gemv_baseline)
     .set_name("gemv_baseline")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("n", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */});
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */});
 
 NVBENCH_BENCH(nvbench_gemv_optimized)
     .set_name("gemv_optimized")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("n", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */});
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */});
 
 NVBENCH_BENCH(nvbench_spmm_baseline)
     .set_name("spmm_baseline")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("n", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("k", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
+    .add_int64_axis("k", {256, 512, 1024, 2048 /*, 4096, 8192, 16384, 32768 */})
     .add_int64_axis("sparsity", {50, 70, 80, 90});
 
 NVBENCH_BENCH(nvbench_spmm_optimized)
     .set_name("spmm_optimized")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("n", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("k", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
+    .add_int64_axis("k", {256, 512, 1024, 2048 /*, 4096, 8192, 16384, 32768 */})
     .add_int64_axis("sparsity", {50, 70, 80, 90});
 
 NVBENCH_BENCH(nvbench_spmv_baseline)
     .set_name("spmv_baseline")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("n", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
     .add_int64_axis("sparsity", {50, 70, 80, 90});
 
 NVBENCH_BENCH(nvbench_spmv_optimized)
     .set_name("spmv_optimized")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
-    .add_int64_axis("n", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
     .add_int64_axis("sparsity", {50, 70, 80, 90});

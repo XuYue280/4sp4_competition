@@ -5,6 +5,7 @@ Speedup is calculated as: baseline_time / optimized_time
 gmean is calculated as: (product of all speedups) ^ (1/n)
 Bonus: sparse optimized kernel vs dense baseline on the same shape (SPMM vs GEMM, SPMV vs GEMV).
 Reads Google Benchmark JSON (CPU) or NVBench JSON (GPU); the configurations come from the JSON.
+The report also lists every metric recorded in the JSON.
 """
 
 import json
@@ -18,6 +19,12 @@ BONUS_PAIRS = {"spmm": "gemm", "spmv": "gemv"}
 BONUS_TARGET = {"CPU": 1.2, "GPU": 1.1}
 EMPTY_TIME = 2e-5  # seconds; if even the slowest config is faster than this, the kernel is treated as empty
 UNIT = {"ns": 1e-9, "us": 1e-6, "ms": 1e-3, "s": 1.0}
+# config (m, n, k, sparsity) -> "A @ B"
+SHAPES = {"gemm": "{0}x{2} @ {2}x{1}", "gemv": "{0}x{1} @ {1}x1",
+          "spmm": "{0}x{2} (sparsity {3}%) @ {2}x{1}", "spmv": "{0}x{1} (sparsity {2}%) @ {1}x1"}
+# Google Benchmark fields not shown in the metrics tables
+CPU_SKIP_FIELDS = {"name", "family_index", "per_family_instance_index", "run_name", "run_type",
+                   "aggregate_name", "aggregate_unit"}
 
 
 def compute_gmean(values):
@@ -31,8 +38,10 @@ def compute_gmean(values):
 
 
 def extract_benchmark_data(json_data):
-    """Extract times (seconds) as {kernel: {variant: {config: [times]}}}, config = benchmark arguments."""
+    """Extract times (seconds) as {kernel: {variant: {config: [times]}}}, config = benchmark arguments,
+    and every recorded metric as {benchmark: [(shape, {metric: value})]}."""
     benchmarks = defaultdict(lambda: {"baseline": defaultdict(list), "optimized": defaultdict(list)})
+    metrics = defaultdict(list)
 
     for bench in json_data.get("benchmarks") or []:
         name, *args = bench["name"].lower().split("/")
@@ -44,16 +53,30 @@ def extract_benchmark_data(json_data):
 
         if "states" in bench:  # NVBench
             for state in bench["states"]:
-                config = tuple(int(a["value"]) for a in state.get("axis_values") or [])
+                axes = {a["name"]: int(a["value"]) for a in state.get("axis_values") or [] if a["name"] != "Device"}
+                if "m" in axes:
+                    axes.setdefault("n", axes["m"])  # square sweep: n = m
+                config = tuple(axes[a] for a in ("m", "n", "k", "sparsity") if a in axes)
+                values = {}
                 for summary in state.get("summaries") or []:
-                    if summary["tag"] == "nv/cold/time/gpu/mean":
-                        value = next(float(d["value"]) for d in summary["data"] if d["name"] == "value")
+                    value = next((d["value"] for d in summary.get("data") or [] if d["name"] == "value"), None)
+                    try:
+                        value = float(value)
+                    except (TypeError, ValueError):
+                        pass
+                    values[summary["tag"].replace("nv/cold/", "").replace("time/", "")] = value
+                    if summary["tag"] == "nv/cold/time/gpu/mean" and isinstance(value, float) and value == value:
                         benchmarks[kernel][variant][config].append(value)
-        elif bench.get("run_type") != "aggregate" and not (bench.get("error_occurred") or bench.get("skipped")):  # Google Benchmark
+                metrics[name].append((SHAPES[kernel].format(*config, 0, 0, 0, 0), values))
+        else:  # Google Benchmark
             config = tuple(int(a) for a in args if a.isdigit())
-            benchmarks[kernel][variant][config].append(bench["real_time"] * UNIT[bench["time_unit"]])
+            values = {"run": bench.get("aggregate_name") or f"rep {bench.get('repetition_index', 0)}"}
+            values.update({k: v for k, v in bench.items() if k not in CPU_SKIP_FIELDS})
+            metrics[name].append((SHAPES[kernel].format(*config, 0, 0, 0, 0), values))
+            if bench.get("run_type") != "aggregate" and not (bench.get("error_occurred") or bench.get("skipped")):
+                benchmarks[kernel][variant][config].append(bench["real_time"] * UNIT[bench["time_unit"]])
 
-    return benchmarks
+    return benchmarks, metrics
 
 
 def median_times(data):
@@ -77,12 +100,17 @@ def compute_speedups(benchmarks):
         optimized_times, optimized_status = median_times(benchmarks[kernel]["optimized"])
         configs = sorted(baseline_times.keys() & optimized_times.keys())
 
-        kernel_speedups = []
+        per_config = []
         if baseline_status == optimized_status == "ok":
-            kernel_speedups = [baseline_times[c] / optimized_times[c] for c in configs]
+            for c in configs:
+                values = {"baseline (s)": baseline_times[c], "optimized (s)": optimized_times[c],
+                          "speedup": baseline_times[c] / optimized_times[c]}
+                per_config.append((SHAPES[kernel].format(*c, 0, 0, 0, 0), values))
+        kernel_speedups = [values["speedup"] for _, values in per_config]
 
         speedups[kernel] = {
             "status": {"baseline": baseline_status, "optimized": optimized_status},
+            "per_config": per_config,
             "individual_speedups": kernel_speedups,
             "gmean_speedup": compute_gmean(kernel_speedups),
             "num_benchmarks": len(kernel_speedups),
@@ -114,7 +142,7 @@ def compute_bonus(benchmarks):
     return bonus
 
 
-def generate_report(speedups, bonus, device, output_file=None):
+def generate_report(speedups, bonus, device, json_data, metrics, output_file=None):
     """Generate and print/save a detailed report."""
     report = []
     report.append("=" * 80)
@@ -122,8 +150,8 @@ def generate_report(speedups, bonus, device, output_file=None):
     report.append("=" * 80)
     report.append("")
 
-    # Per-kernel analysis
-    report.append("PER-KERNEL SPEEDUP ANALYSIS:")
+    # Per-kernel speedup
+    report.append("PER-KERNEL SPEEDUP:")
     report.append("-" * 80)
 
     for kernel, data in speedups.items():
@@ -136,26 +164,26 @@ def generate_report(speedups, bonus, device, output_file=None):
             continue
 
         report.append(f"  Number of benchmark configurations: {data['num_benchmarks']} (of {data['num_configs']})")
-        report.append(f"  Geometric Mean Speedup: {data['gmean_speedup']:.4f}x")
+        report.append(f"  Per-Kernel Speedup (gmean): {data['gmean_speedup']:.4f}x")
         report.append(f"  Min Speedup: {min(data['individual_speedups']):.4f}x")
         report.append(f"  Max Speedup: {max(data['individual_speedups']):.4f}x")
         report.append(f"  Avg Speedup: {sum(data['individual_speedups']) / len(data['individual_speedups']):.4f}x")
 
-    # Overall analysis
+    # Cross-kernel speedup
     report.append("")
     report.append("=" * 80)
-    report.append("OVERALL SPEEDUP ANALYSIS (across all kernels):")
+    report.append("CROSS-KERNEL SPEEDUP (across all kernels):")
     report.append("-" * 80)
 
     scored = {k: d["gmean_speedup"] for k, d in speedups.items() if d["gmean_speedup"] is not None}
     if scored:
         best, worst = max(scored, key=scored.get), min(scored, key=scored.get)
-        report.append(f"Overall Geometric Mean Speedup: {compute_gmean(list(scored.values())):.4f}x")
+        report.append(f"Cross-Kernel Speedup (gmean): {compute_gmean(list(scored.values())):.4f}x")
         report.append(f"Number of kernels: {len(scored)} (of {len(speedups)})")
         report.append(f"Best kernel speedup: {scored[best]:.4f}x ({best})")
         report.append(f"Worst kernel speedup: {scored[worst]:.4f}x ({worst})")
     else:
-        report.append("Overall Geometric Mean Speedup: n/a (no kernel could be scored)")
+        report.append("Cross-Kernel Speedup (gmean): n/a (no kernel could be scored)")
 
     # Bonus analysis
     target = BONUS_TARGET[device]
@@ -177,6 +205,41 @@ def generate_report(speedups, bonus, device, output_file=None):
     else:
         bonus_gmean = compute_gmean(bonus_gmeans)
         report.append(f"Bonus Geometric Mean Speedup: {bonus_gmean:.4f}x  {'PASS' if bonus_gmean >= target else 'FAIL'}")
+
+    # Environment
+    report.append("")
+    report.append("=" * 80)
+    report.append("ENVIRONMENT:")
+    report.append("-" * 80)
+    for key, value in (json_data.get("context") or {}).items():
+        report.append(f"{key}: {value}")
+    for device_info in json_data.get("devices") or []:
+        for key, value in device_info.items():
+            report.append(f"{key}: {value}")
+
+    # Per-configuration speedups and all recorded metrics
+    tables = [(f"Speedup per configuration: {k}", d["per_config"]) for k, d in speedups.items() if d["per_config"]]
+    tables += [(f"Recorded metrics: {name}", rows) for name, rows in metrics.items()]
+    report.append("")
+    report.append("=" * 80)
+    report.append("DETAILS (CPU times in time_unit, GPU times in seconds):")
+    report.append("-" * 80)
+    for title, rows in tables:
+        columns = []
+        for _, values in rows:
+            columns += [c for c in values if c not in columns]
+        lines = [["A @ B"] + columns]
+        for shape, values in rows:
+            cells = [shape]
+            for c in columns:
+                value = values.get(c, "-")
+                if isinstance(value, float):
+                    value = str(int(value)) if value.is_integer() else f"{value:.4g}"
+                cells.append(str(value))
+            lines.append(cells)
+        widths = [max(len(line[i]) for line in lines) for i in range(len(lines[0]))]
+        report.append(f"\n{title}")
+        report += ["  " + "  ".join(cell.rjust(w) for cell, w in zip(line, widths)) for line in lines]
 
     report.append("=" * 80)
 
@@ -216,12 +279,12 @@ def main():
     device = "CPU" if "context" in json_data else "GPU"
 
     # Extract and process benchmark data
-    benchmarks = extract_benchmark_data(json_data)
+    benchmarks, metrics = extract_benchmark_data(json_data)
     speedups = compute_speedups(benchmarks)
     bonus = compute_bonus(benchmarks)
 
     # Generate and display report
-    generate_report(speedups, bonus, device, output_file)
+    generate_report(speedups, bonus, device, json_data, metrics, output_file)
 
     if output_file:
         print(f"\nReport saved to: {output_file}")

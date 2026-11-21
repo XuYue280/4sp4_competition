@@ -51,7 +51,7 @@ python3 $(pwd)/script/compute_speedup.py $(pwd)/logs/project.json $(pwd)/logs/cp
 echo "---- Running GPU Benchmarks ----"
 
 echo "Running GEMM/GEMV/SpMM/SpMV GPU benchmarks..."
-$(pwd)/build/project_gpu --json "$(pwd)/logs/project_gpu.json"
+$(pwd)/build/project_gpu --stopping-criterion entropy --json "$(pwd)/logs/project_gpu.json"
 
 echo "Computing speedup metrics for GPU kernels..."
 python3 $(pwd)/script/compute_speedup.py $(pwd)/logs/project_gpu.json $(pwd)/logs/gpu_speedup_report.txt
