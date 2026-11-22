@@ -35,14 +35,20 @@ This is not just an assignment—it's a **COMPETITION**! Your implementations wi
 
 ## How Speedup Is Measured
 
-1. **Speedup is computed from the benchmark results.** After `build_run.sh` runs the benchmarks, it calls `script/compute_speedup.py`. The script reads the results (`logs/project.json` for CPU, `logs/project_gpu.json` for GPU) and computes speedup = baseline geometric mean / optimized geometric mean. The report gives:
+1. **Speedup is computed from the benchmark results.** After `build_run.sh` runs the benchmarks, it calls `script/compute_speedup.py`. The script reads the results (`logs/project.json` for CPU, `logs/project_gpu.json` for GPU) and computes:
+
+```
+speedup = baseline geometric mean / optimized geometric mean
+```
+
+The report gives:
    - the per-kernel and cross-kernel speedups;
    - the bonus comparison of the sparse kernels against the dense baselines;
    - the report will show `not implemented` for kernels that are not implemented.
 
    The results are printed in the `.out` file and also saved to `logs/cpu_speedup_report.txt` and `logs/gpu_speedup_report.txt`.
 
-2. **Sweep sizes.** CPU and GPU use the same sweep for matrix dimensions:
+3. **Sweep sizes.** CPU and GPU use the same sweep for matrix dimensions:
    - `m` ∈ {256, 512, 1024, 2048, 4096, 8192, 16384}
    - `k` ∈ {256, 512, 1024, 2048} 
    - sparsity ∈ {50%, 70%, 80%, 90%}
@@ -58,7 +64,7 @@ This is not just an assignment—it's a **COMPETITION**! Your implementations wi
    | SpMM   | `m`, `k`, sparsity | 7 × 4 × 4 = 112 |
    | SpMV   | `m`, sparsity      | 7 × 4 = 28      |
 
-3. **Recommendations.** While debugging, or if your kernels exceed the 45-minute job limit, you may comment out the larger dimension. For example, comment out the `->Args(...)` lines in `main_bench.cpp` for CPU and the `add_int64_axis(...)` values in `main_bench.cu` for GPU.
+4. **Recommendations.** While debugging, or if your kernels exceed the 45-minute job limit, you may comment out the larger dimension. For example, comment out the `->Args(...)` lines in `main_bench.cpp` for CPU and the `add_int64_axis(...)` values in `main_bench.cu` for GPU.
 
 ---
 
