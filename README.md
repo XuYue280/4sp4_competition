@@ -41,14 +41,14 @@ This is not just an assignment—it's a **COMPETITION**! Your implementations wi
 speedup = baseline geometric mean / optimized geometric mean
 ```
 
-The report gives:
-   - the per-kernel and cross-kernel speedups;
-   - the bonus comparison of the sparse kernels against the dense baselines;
-   - the report will show `not implemented` for kernels that are not implemented.
+   The report gives:
+      - the per-kernel and cross-kernel speedups;
+      - the bonus comparison of the sparse kernels against the dense baselines;
+      - the report will show `not implemented` for kernels that are not implemented.
 
    The results are printed in the `.out` file and also saved to `logs/cpu_speedup_report.txt` and `logs/gpu_speedup_report.txt`.
 
-3. **Sweep sizes.** CPU and GPU use the same sweep for matrix dimensions:
+2. **Sweep sizes.** CPU and GPU use the same sweep for matrix dimensions:
    - `m` ∈ {256, 512, 1024, 2048, 4096, 8192, 16384}
    - `k` ∈ {256, 512, 1024, 2048} 
    - sparsity ∈ {50%, 70%, 80%, 90%}
@@ -64,7 +64,7 @@ The report gives:
    | SpMM   | `m`, `k`, sparsity | 7 × 4 × 4 = 112 |
    | SpMV   | `m`, sparsity      | 7 × 4 = 28      |
 
-4. **Recommendations.** While debugging, or if your kernels exceed the 45-minute job limit, you may comment out the larger dimension. For example, comment out the `->Args(...)` lines in `main_bench.cpp` for CPU and the `add_int64_axis(...)` values in `main_bench.cu` for GPU.
+3. **Recommendations.** While debugging, or if your kernels exceed the 45-minute job limit, you may comment out the larger dimension. For example, comment out the `->Args(...)` lines in `main_bench.cpp` for CPU and the `add_int64_axis(...)` values in `main_bench.cu` for GPU.
 
 ---
 
