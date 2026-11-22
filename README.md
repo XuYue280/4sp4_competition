@@ -41,28 +41,28 @@ This is not just an assignment—it's a **COMPETITION**! Your implementations wi
 speedup = baseline geometric mean / optimized geometric mean
 ```
 
-   The report gives:
-      - the per-kernel and cross-kernel speedups;
-      - the bonus comparison of the sparse kernels against the dense baselines;
-      - the report will show `not implemented` for kernels that are not implemented.
+The report gives:
+   - the per-kernel and cross-kernel speedups;
+   - the bonus comparison of the sparse kernels against the dense baselines;
+   - the report will show `not implemented` for kernels that are not implemented.
 
-   The results are printed in the `.out` file and also saved to `logs/cpu_speedup_report.txt` and `logs/gpu_speedup_report.txt`.
+The results are printed in the `.out` file and also saved to `logs/cpu_speedup_report.txt` and `logs/gpu_speedup_report.txt`.
 
 2. **Sweep sizes.** CPU and GPU use the same sweep for matrix dimensions:
-   - `m` ∈ {256, 512, 1024, 2048, 4096, 8192, 16384}
-   - `k` ∈ {256, 512, 1024, 2048} 
-   - sparsity ∈ {50%, 70%, 80%, 90%}
+- `m` ∈ {256, 512, 1024, 2048, 4096, 8192, 16384}
+- `k` ∈ {256, 512, 1024, 2048} 
+- sparsity ∈ {50%, 70%, 80%, 90%}
 
-   GEMM and SpMM compute `C = A @ B`, where `A` is `m × k` and `B` is `k × m`. GEMV and SpMV compute `y = A @ x`, where `A` is `m × m` and `x` is `m × 1`. For SpMM and SpMV, `A` is sparse.
+GEMM and SpMM compute `C = A @ B`, where `A` is `m × k` and `B` is `k × m`. GEMV and SpMV compute `y = A @ x`, where `A` is `m × m` and `x` is `m × 1`. For SpMM and SpMV, `A` is sparse.
 
-   Configurations per kernel (run for both the baseline and your optimized kernel):
+Configurations per kernel (run for both the baseline and your optimized kernel):
 
-   | Kernel | Swept parameters   | Configurations  |
-   |--------|--------------------|-----------------|
-   | GEMM   | `m`, `k`           | 7 × 4 = 28      |
-   | GEMV   | `m`                | 7               |
-   | SpMM   | `m`, `k`, sparsity | 7 × 4 × 4 = 112 |
-   | SpMV   | `m`, sparsity      | 7 × 4 = 28      |
+| Kernel | Swept parameters   | Configurations  |
+|--------|--------------------|-----------------|
+| GEMM   | `m`, `k`           | 7 × 4 = 28      |
+| GEMV   | `m`                | 7               |
+| SpMM   | `m`, `k`, sparsity | 7 × 4 × 4 = 112 |
+| SpMV   | `m`, sparsity      | 7 × 4 = 28      |
 
 3. **Recommendations.** While debugging, or if your kernels exceed the 45-minute job limit, you may comment out the larger dimension. For example, comment out the `->Args(...)` lines in `main_bench.cpp` for CPU and the `add_int64_axis(...)` values in `main_bench.cu` for GPU.
 
