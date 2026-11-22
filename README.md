@@ -28,7 +28,7 @@ This is not just an assignment—it's a **COMPETITION**! Your implementations wi
 ### 📊 Metrics Tracked
 - **Per-Kernel Speedup:** Geometric mean speedup for each operation (GEMM, GEMV, SpMM, SpMV)
 - **Cross-Kernel Speedup:** Overall geometric mean speedup across all 4 kernels
-- **Scalability:** Performance across 8 different matrix sizes (256 to 16384)
+- **Scalability:** Performance across 7 different matrix sizes (256 to 16384)
 - **Sparsity Efficiency:** Speedup improvement at 50%, 70%, 80%, and 90% sparsity levels
 
 ---
