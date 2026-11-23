@@ -1,6 +1,7 @@
 # 🏎️ HPP Grand Prix: High-Performance Programming Competition
 
 The goal is to go beyond the baseline performance of dense linear algebra libraries (Intel MKL and NVIDIA cuBLAS/cuSPARSE) by implementing **sparse linear algebra kernels**. You will implement 4 kernels:
+
 1. **GEMM:** Dense matrix-matrix multiplication
 2. **GEMV:** Dense matrix-vector multiplication
 3. **SpMM:** Sparse matrix-matrix multiplication
@@ -13,14 +14,15 @@ The goal is to go beyond the baseline performance of dense linear algebra librar
 ## 🏆 Competition Leaderboard
 
 This is not just an assignment—it's a **COMPETITION**! Your implementations will be ranked against:
+
 - **CPU Baseline:** Intel MKL (Matrix Kernel Library)
 - **GPU Baseline:** NVIDIA cuBLAS and cuSPARSE
 
-
 ### 📊 Metrics Tracked
+
 - **Per-Kernel Speedup:** Geometric mean speedup for each operation (GEMM, GEMV, SpMM, SpMV)
 - **Cross-Kernel Speedup:** Overall geometric mean speedup across all 4 kernels
-- **Scalability:** Performance across 7 different matrix sizes (256 to 16384)
+- **Scalability:** Performance across 6 different matrix sizes (256 to 8192)
 - **Sparsity Efficiency:** Speedup improvement at 50%, 70%, 80%, and 90% sparsity levels
 
 ---
@@ -28,40 +30,29 @@ This is not just an assignment—it's a **COMPETITION**! Your implementations wi
 ## How Speedup Is Measured
 
 1. **Speedup is computed from the benchmark results.** After `build_run.sh` runs the benchmarks, it calls `script/compute_speedup.py`. The script reads the results (`logs/project.json` for CPU, `logs/project_gpu.json` for GPU) and computes:
-
    ```
-   speedup = baseline geometric mean / optimized geometric mean
+           speedup = baseline geometric mean / optimized geometric mean
    ```
-
-   The report gives:
    - the per-kernel and cross-kernel speedups;
-   - the bonus comparison of the sparse kernels against the dense baselines;
-   - the report will show `not implemented` for kernels that are not implemented.
-
-   The results are printed in the `.out` file and also saved to `logs/cpu_speedup_report.txt` and `logs/gpu_speedup_report.txt`.
-
+   - The speedups are printed in the `.out` file and also saved to `logs/cpu_speedup_report.txt` and `logs/gpu_speedup_report.txt`.  If you didn't implement the function or kernel, it will show `not implemented`.
 2. **Sweep sizes.** CPU and GPU use the same sweep for matrix dimensions:
    - `m` ∈ {256, 512, 1024, 2048, 4096, 8192}
-   - `k` ∈ {32, 64, 256, 512} 
+   - `k` ∈ {32, 64, 128, 256}
    - sparsity ∈ {50%, 70%, 80%, 90%}
 
-   GEMM and SpMM compute `C = A @ B`, where `A` is `m × k` and `B` is `k × m`. GEMV and SpMV compute `y = A @ x`, where `A` is `m × m` and `x` is `m × 1`. For SpMM and SpMV, `A` is sparse.
+     GEMM and SpMM compute `C = A @ B`, where `A` is `m × k` and `B` is `k × m`. GEMV and SpMV compute `y = A @ x`, where `A` is `m × m` and `x` is `m × 1`. For SpMM and SpMV, `A` is sparse.
 
-   Configurations per kernel (run for both the baseline and your optimized kernel):
-
-   | Kernel | Swept parameters   | Configurations  |
-   |--------|--------------------|-----------------|
-   | GEMM   | `m`, `k`           | 7 × 4 = 28      |
-   | GEMV   | `m`                | 7               |
-   | SpMM   | `m`, `k`, sparsity | 7 × 4 × 4 = 112 |
-   | SpMV   | `m`, sparsity      | 7 × 4 = 28      |
-
+     Configurations per kernel (run for both the baseline and your optimized kernel):
+     | Kernel | Swept parameters   | Configurations  |
+     |--------|--------------------|-----------------|
+     | GEMM   | `m`, `k`           | 6 × 4 = 24      |
+     | GEMV   | `m`                | 6               |
+     | SpMM   | `m`, `k`, sparsity | 6 × 4 × 4 = 96  |
+     | SpMV   | `m`, sparsity      | 6 × 4 = 24      |
 3. **Recommendations.** While debugging, or if your kernels exceed the 45-minute job limit, you may comment out the larger dimension. For example, comment out the `->Args(...)` lines in `main_bench.cpp` for CPU and the `add_int64_axis(...)` values in `main_bench.cu` for GPU.
 
-
-
-
 ## 🛠️ Logging in to the ECE Cluster
+
 The ECE computer server is a local server used for this course. The ECE server
 has 6 nodes, each with a 20-core Intel CPU and an NVIDIA Ada2000 GPU. The ECE server
 uses a SLURM scheduler. SLURM (Simple Linux Utility for Resource Management)
@@ -72,18 +63,13 @@ need a username to log in to the server. Your username and password are provided
 With that, you will need to SSH to the server using the
 following command:
 
- ```
- ssh <username>@srv-cad.ece.mcmaster.ca
- ```
-
 ***
 
 ## ➕ Cloning the Repository
 
-This step explains how to clone the repository. You will use **`git`**, a version
-control system, to clone the repository and push your code to it. To clone
+This step explains how to clone the repository. You will use `git`, a version  
+control system, to clone the repository and push your code to it. To clone  
 the repository, you will need to use the following command:
-
 
 ```
 git clone https://github.com/4sp4-fall-2026/<repo name>.git
@@ -92,7 +78,6 @@ git clone https://github.com/4sp4-fall-2026/<repo name>.git
 Where `repo name` is your repository. The repository is private, so you may get an
 error when you enter your username and password. To solve this, you will need to
 use a **Personal Access Token (PAT)** instead of your password.
-
 
 ***
 
@@ -104,6 +89,7 @@ ECE cluster. First, go to where the project is cloned:
 ```
 cd <where/the/repo/is/cloned>
 ```
+
 All necessary instructions to build and run the code are
 provided in the `build_run.sh` file.
 You can open the file using a text editor like `nano` or `vim`,
@@ -118,41 +104,45 @@ This command submits the `build_run.sh` script to the SLURM scheduler.
 The instructions in the `build_run.sh` file are unix commands that will be executed on a compute node. The output of
 the job will be saved in a `*.out` file.
 
-* **Never use `bash`** to run your code on the login node.
-  Use `sbatch` instead. `bash` runs the code directly on
-  the login node, while `sbatch` submits the job to the SLURM
-  scheduler, which runs it on an available compute node.
+* **Never use** `bash` to run your code on the login node.
+Use `sbatch` instead. `bash` runs the code directly on
+the login node, while `sbatch` submits the job to the SLURM
+scheduler, which runs it on an available compute node.
 * You should **never** run code on the login node unless it
-  takes less than 30 seconds.
+takes less than 30 seconds.
 * You can check the status of your job using `squeue -u <username>`.
 
-
 ***
-
 
 ## ✅ Tasks
 
 - First pick a cool name for your group and update "GroupName.txt" in the root of the repository.
-- Do not change anything else except for the 4 functions and 4 kernels that you are required to implement. 
-
+- Implement the following and do not change anything else:
+  | Part          | What to implement                                                                                   | Where                                                                              |
+  | ------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+  | CPU functions | the functions `gemm`, `gemv`, `spmmCSR`, `spmvCSR`                                                  | `src/gemm.cpp`, `src/gemv.cpp`, `src/spmm.cpp`, `src/spmv.cpp`                     |
+  | GPU kernels   | the kernels `GEMM`, `GEMV`, `SpMM`, `SpMV`                                                          | `src/kernels.cu`                                                                   |
+  | GPU benchmark | the launch of each kernel, at `// TODO: Call optimized ... implementation` in `nvbench_*_optimized` | `main_bench.cu`                                                                    |
+  | GPU test      | the same as kernel launch, at `// TODO: Launch your ... kernel here`                                | `test/gemm_test.cu`, `test/gemv_test.cu`, `test/spmm_test.cu`, `test/spmv_test.cu` |
 
 ### Evaluation
 
-You can see your score, there will be three gmeans speedups. 
-We use the overall gmean speedup to rank the submissions. 
-
+You can see your score in term of geometric mean speedups.  
+We use the overall geometric mean speedup to rank the submissions. 
 
 ### Submission
+
 Follow these guidelines for a successful submission:
+
 * First, please implement all TODOs in the code and remove all comments that
-  start with `TODO`.
+start with `TODO`.
 * Push all your code to the main branch of your repository before the deadline.
 * Ensure your code compiles and runs on the ECE cluster. Submissions that fail to
-  compile or run will receive a grade of zero. The TA will only use the `build_run.sh` file for
-  building and running your code. You may want to make a copy of the script for your final testing.
+compile or run will receive a grade of zero. The TA will only use the `build_run.sh` file for
+building and running your code. You may want to make a copy of the script for your final testing.
 * The build_run.sh script's execution should only output results from Google Test and
-  Google Benchmark. Do not include any extra output from cout or printf. This can negatively
-  impact your grade, and regrade requests for this reason will not be accepted.
+Google Benchmark. Do not include any extra output from cout or printf. This can negatively
+impact your grade, and regrade requests for this reason will not be accepted.
 * If your code fails in any of the provided test cases, you will not be considered for the competition.
 
 

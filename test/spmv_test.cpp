@@ -6,8 +6,11 @@
 // without express written permission from SwiftWare Lab.
 
 #include "spmv.h"
+#include "gemv.h"
 #include <gtest/gtest.h>
 #include <cmath>
+#include <random>
+#include <vector>
 
 namespace swiftware::hpp {
     //TODO: Add more tests
@@ -31,5 +34,42 @@ namespace swiftware::hpp {
         EXPECT_NEAR(c[2], 3.0f, 1e-5);
         EXPECT_NEAR(c[3], 4.0f, 1e-5);
     }
+
+#ifdef USE_MKL
+    // Test spmv against dense MKL gemv on a random 70% sparse matrix (small integer values)
+    TEST(SpmvTest, RandomTest) {
+        int m = 1000, n = 500, sparsity = 70;
+        std::mt19937 gen(42);
+        std::uniform_int_distribution<int> dist(-2, 2);
+        std::uniform_int_distribution<int> percent(0, 99);
+
+        // Random sparse A, stored both as dense (for MKL) and as CSR
+        std::vector<float> A(m * n, 0.0f);
+        std::vector<int> Ap(m + 1, 0), Ai;
+        std::vector<float> Ax;
+        for (int i = 0; i < m; ++i) {
+            for (int j = 0; j < n; ++j) {
+                if (percent(gen) >= sparsity) {
+                    A[i * n + j] = dist(gen);
+                    Ai.push_back(j);
+                    Ax.push_back(A[i * n + j]);
+                }
+            }
+            Ap[i + 1] = Ai.size();
+        }
+
+        std::vector<float> b(n), c(m), c_ref(m);
+        for (auto &v : b) v = dist(gen);
+        for (int i = 0; i < m; ++i) c[i] = c_ref[i] = dist(gen);
+
+        ScheduleParams sp(-1, -1);
+        spmvCSR(m, n, Ap.data(), Ai.data(), Ax.data(), b.data(), c.data(), sp);
+        gemvMKL(m, n, A.data(), b.data(), c_ref.data(), sp);
+
+        for (int i = 0; i < m; ++i) {
+            ASSERT_NEAR(c[i], c_ref[i], 1e-5) << "at index " << i;
+        }
+    }
+#endif
 
 }

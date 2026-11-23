@@ -27,6 +27,9 @@ namespace swiftware::hpp {
   /// \param Sp Schedule parameters
   void spmmCSR(int m, int n, int k, const int *Ap, const int *Ai, const float *Ax, const float *B, float *C, ScheduleParams Sp);
 
+#ifdef USE_MKL
+  void spmmMKL(int m, int n, int k, const int *Ap, const int *Ai, const float *Ax, const float *B, float *C, ScheduleParams Sp);
+#endif
 }
 
 #endif //PROJECT_DENSE_MATMUL_SPMM_H

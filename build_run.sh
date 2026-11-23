@@ -2,10 +2,10 @@
 
 ##################### SLURM (do not change) v  #####################
 #SBATCH --export=ALL
-#SBATCH --job-name="project"
+#SBATCH --job-name="competition"
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --output="project.%j.%N.out"
+#SBATCH --output="competition.%j.%N.out"
 #SBATCH -t 00:45:00
 ##################### SLURM (do not change) ^  #####################
 
@@ -59,6 +59,10 @@ $(pwd)/build/test/project_gemm_test
 $(pwd)/build/test/project_gemv_test
 $(pwd)/build/test/project_spmm_test
 $(pwd)/build/test/project_spmv_test
+$(pwd)/build/test/project_gemm_gpu_test
+$(pwd)/build/test/project_gemv_gpu_test
+$(pwd)/build/test/project_spmm_gpu_test
+$(pwd)/build/test/project_spmv_gpu_test
 
 echo "Computing speedup metrics for GPU kernels..."
 python3 $(pwd)/script/compute_speedup.py $(pwd)/logs/project_gpu.json $(pwd)/logs/gpu_speedup_report.txt

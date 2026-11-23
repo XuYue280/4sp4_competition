@@ -8,6 +8,8 @@
 #include <nvbench/nvbench.cuh>
 #include "kernels.cuh"
 #include "gpu_utils.h"
+#include <cublas_v2.h>
+#include <cusparse.h>
 #include <vector>
 #include <cmath>
 
@@ -42,11 +44,20 @@ void nvbench_gemm_baseline(nvbench::state& state)
     cudaMemcpy(d_A, h_A.data(), m * k * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_B, h_B.data(), k * n * sizeof(float), cudaMemcpyHostToDevice);
 
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    const float alpha = 1.0f, beta = 1.0f;
+
     state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
+        cublasSetStream(handle, launch.get_stream());
         timer.start();
-        // TODO: Call cuBLAS gemm baseline implementation
+        // cuBLAS GEMM: C = alpha*A*B + beta*C (beta=1.0 to accumulate)
+        // cuBLAS is column-major, so computing C^T = B^T * A^T gives the row-major C
+        cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, d_B, n, d_A, k, &beta, d_C, n);
         timer.stop();
     });
+
+    cublasDestroy(handle);
 
     cudaFree(d_A);
     cudaFree(d_B);
@@ -113,11 +124,20 @@ void nvbench_gemv_baseline(nvbench::state& state)
     cudaMemcpy(d_A, h_A.data(), m * n * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_x, h_x.data(), n * sizeof(float), cudaMemcpyHostToDevice);
 
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    const float alpha = 1.0f, beta = 1.0f;
+
     state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
+        cublasSetStream(handle, launch.get_stream());
         timer.start();
-        // TODO: Call cuBLAS gemv baseline implementation
+        // cuBLAS GEMV: y = alpha*A*x + beta*y (beta=1.0 to accumulate)
+        // cuBLAS is column-major, so the row-major m x n A is used transposed
+        cublasSgemv(handle, CUBLAS_OP_T, n, m, &alpha, d_A, n, d_x, 1, &beta, d_y, 1);
         timer.stop();
     });
+
+    cublasDestroy(handle);
 
     cudaFree(d_A);
     cudaFree(d_x);
@@ -208,11 +228,37 @@ void nvbench_spmm_baseline(nvbench::state& state)
     cudaMemcpy(d_Ax, h_Ax.data(), nnz * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_B, h_B.data(), k * n * sizeof(float), cudaMemcpyHostToDevice);
 
+    // cuSPARSE SpMM: C = alpha*A*B + beta*C (beta=1.0 to accumulate)
+    // nnz passed to cuSPARSE is the number of entries actually filled, h_Ap[m]
+    cusparseHandle_t handle;
+    cusparseSpMatDescr_t matA;
+    cusparseDnMatDescr_t matB, matC;
+    cusparseCreate(&handle);
+    cusparseCreateCsr(&matA, m, k, h_Ap[m], d_Ap, d_Ai, d_Ax,
+                      CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F);
+    cusparseCreateDnMat(&matB, k, n, n, d_B, CUDA_R_32F, CUSPARSE_ORDER_ROW);
+    cusparseCreateDnMat(&matC, m, n, n, d_C, CUDA_R_32F, CUSPARSE_ORDER_ROW);
+
+    const float alpha = 1.0f, beta = 1.0f;
+    size_t buffer_size = 0;
+    void *d_buffer = nullptr;
+    cusparseSpMM_bufferSize(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                            &alpha, matA, matB, &beta, matC, CUDA_R_32F, CUSPARSE_SPMM_ALG_DEFAULT, &buffer_size);
+    cudaMalloc(&d_buffer, buffer_size);
+
     state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
+        cusparseSetStream(handle, launch.get_stream());
         timer.start();
-        // TODO: Call cuSPARSE spmm baseline implementation
+        cusparseSpMM(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                     &alpha, matA, matB, &beta, matC, CUDA_R_32F, CUSPARSE_SPMM_ALG_DEFAULT, d_buffer);
         timer.stop();
     });
+
+    cudaFree(d_buffer);
+    cusparseDestroySpMat(matA);
+    cusparseDestroyDnMat(matB);
+    cusparseDestroyDnMat(matC);
+    cusparseDestroy(handle);
 
     cudaFree(d_Ap);
     cudaFree(d_Ai);
@@ -329,11 +375,37 @@ void nvbench_spmv_baseline(nvbench::state& state)
     cudaMemcpy(d_Ax, h_Ax.data(), nnz * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_x, h_x.data(), n * sizeof(float), cudaMemcpyHostToDevice);
 
+    // cuSPARSE SpMV: y = alpha*A*x + beta*y (beta=1.0 to accumulate)
+    // nnz passed to cuSPARSE is the number of entries actually filled, h_Ap[m]
+    cusparseHandle_t handle;
+    cusparseSpMatDescr_t matA;
+    cusparseDnVecDescr_t vecX, vecY;
+    cusparseCreate(&handle);
+    cusparseCreateCsr(&matA, m, n, h_Ap[m], d_Ap, d_Ai, d_Ax,
+                      CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F);
+    cusparseCreateDnVec(&vecX, n, d_x, CUDA_R_32F);
+    cusparseCreateDnVec(&vecY, m, d_y, CUDA_R_32F);
+
+    const float alpha = 1.0f, beta = 1.0f;
+    size_t buffer_size = 0;
+    void *d_buffer = nullptr;
+    cusparseSpMV_bufferSize(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                            &alpha, matA, vecX, &beta, vecY, CUDA_R_32F, CUSPARSE_SPMV_ALG_DEFAULT, &buffer_size);
+    cudaMalloc(&d_buffer, buffer_size);
+
     state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
+        cusparseSetStream(handle, launch.get_stream());
         timer.start();
-        // TODO: Call cuSPARSE spmv baseline implementation
+        cusparseSpMV(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                     &alpha, matA, vecX, &beta, vecY, CUDA_R_32F, CUSPARSE_SPMV_ALG_DEFAULT, d_buffer);
         timer.stop();
     });
+
+    cudaFree(d_buffer);
+    cusparseDestroySpMat(matA);
+    cusparseDestroyDnVec(vecX);
+    cusparseDestroyDnVec(vecY);
+    cusparseDestroy(handle);
 
     cudaFree(d_Ap);
     cudaFree(d_Ai);
@@ -410,40 +482,40 @@ void nvbench_spmv_optimized(nvbench::state& state)
 
 NVBENCH_BENCH(nvbench_gemm_baseline)
     .set_name("gemm_baseline")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
-    .add_int64_axis("k", {256, 512, 1024, 2048 /*, 4096, 8192, 16384, 32768 */});
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
+    .add_int64_axis("k", {32, 64, 128, 256});
 
 NVBENCH_BENCH(nvbench_gemm_optimized)
     .set_name("gemm_optimized")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
-    .add_int64_axis("k", {256, 512, 1024, 2048 /*, 4096, 8192, 16384, 32768 */});
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
+    .add_int64_axis("k", {32, 64, 128, 256});
 
 NVBENCH_BENCH(nvbench_gemv_baseline)
     .set_name("gemv_baseline")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */});
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */});
 
 NVBENCH_BENCH(nvbench_gemv_optimized)
     .set_name("gemv_optimized")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */});
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */});
 
 NVBENCH_BENCH(nvbench_spmm_baseline)
     .set_name("spmm_baseline")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
-    .add_int64_axis("k", {256, 512, 1024, 2048 /*, 4096, 8192, 16384, 32768 */})
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
+    .add_int64_axis("k", {32, 64, 128, 256})
     .add_int64_axis("sparsity", {50, 70, 80, 90});
 
 NVBENCH_BENCH(nvbench_spmm_optimized)
     .set_name("spmm_optimized")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
-    .add_int64_axis("k", {256, 512, 1024, 2048 /*, 4096, 8192, 16384, 32768 */})
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
+    .add_int64_axis("k", {32, 64, 128, 256})
     .add_int64_axis("sparsity", {50, 70, 80, 90});
 
 NVBENCH_BENCH(nvbench_spmv_baseline)
     .set_name("spmv_baseline")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
     .add_int64_axis("sparsity", {50, 70, 80, 90});
 
 NVBENCH_BENCH(nvbench_spmv_optimized)
     .set_name("spmv_optimized")
-    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192, 16384 /*, 32768 */})
+    .add_int64_axis("m", {256, 512, 1024, 2048, 4096, 8192 /*, 16384, 32768 */})
     .add_int64_axis("sparsity", {50, 70, 80, 90});

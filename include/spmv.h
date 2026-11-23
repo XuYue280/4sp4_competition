@@ -23,6 +23,9 @@ namespace swiftware::hpp {
   /// \param Sp Schedule parameters
   void spmvCSR(int m, int n, const int *Ap, const int *Ai, const float *Ax, const float *b, float *c, ScheduleParams Sp);
 
+#ifdef USE_MKL
+  void spmvMKL(int m, int n, const int *Ap, const int *Ai, const float *Ax, const float *b, float *c, ScheduleParams Sp);
+#endif
 
 }
 
