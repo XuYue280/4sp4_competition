@@ -53,10 +53,6 @@ echo "---- Running GPU Benchmarks ----"
 echo "Running GEMM/GEMV/SpMM/SpMV GPU benchmarks..."
 $(pwd)/build/project_gpu --stopping-criterion entropy --json "$(pwd)/logs/project_gpu.json"
 
-echo "Computing speedup metrics for GPU kernels..."
-python3 $(pwd)/script/compute_speedup.py $(pwd)/logs/project_gpu.json $(pwd)/logs/gpu_speedup_report.txt
-
-
 echo "---- Running Tests ----"
 
 $(pwd)/build/test/project_gemm_test
@@ -64,10 +60,12 @@ $(pwd)/build/test/project_gemv_test
 $(pwd)/build/test/project_spmm_test
 $(pwd)/build/test/project_spmv_test
 
+echo "Computing speedup metrics for GPU kernels..."
+python3 $(pwd)/script/compute_speedup.py $(pwd)/logs/project_gpu.json $(pwd)/logs/gpu_speedup_report.txt
 
-echo "---- Plotting ----"
 
-mkdir -p $(pwd)/plots
-python3 $(pwd)/script/plot.py $(pwd)/logs/project.json
+
+
+
 
 echo "---- All benchmarks completed ----"

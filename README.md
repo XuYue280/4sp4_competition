@@ -1,18 +1,14 @@
 # 🏎️ HPP Grand Prix: High-Performance Programming Competition
 
-## 🎓 Learning Objectives
-
-By the end of this project, you will be able to:
-* Design and optimize dense neural networks on CPU and GPU.
-* Implement efficient sparse neural networks with tunable sparsity levels.
-* Develop high-performance matrix multiplication (MM) and matrix-vector (MV) kernels.
-* Optimize sparse matrix operations (SpMM and SpMV) for various sparsity ratios.
-* Compete with and potentially outperform industry-standard libraries (Intel MKL, cuBLAS, cuSPARSE).
-
-**Note:** You must review Tutorial 01 before starting this lab. You will need to
-finish tutorial 02 for the GPU part.
+The goal is to go beyond the baseline performance of dense linear algebra libraries (Intel MKL and NVIDIA cuBLAS/cuSPARSE) by implementing **sparse linear algebra kernels**. You will implement 4 kernels:
+1. **GEMM:** Dense matrix-matrix multiplication
+2. **GEMV:** Dense matrix-vector multiplication
+3. **SpMM:** Sparse matrix-matrix multiplication
+4. **SpMV:** Sparse matrix-vector multiplication
 
 ---
+
+## DEADLINE: 2026-12-06 23:59:59
 
 ## 🏆 Competition Leaderboard
 
@@ -20,10 +16,6 @@ This is not just an assignment—it's a **COMPETITION**! Your implementations wi
 - **CPU Baseline:** Intel MKL (Matrix Kernel Library)
 - **GPU Baseline:** NVIDIA cuBLAS and cuSPARSE
 
-### 🥇 Bonus Point Targets
-- **Sparse NN vs Dense MKL (CPU):** Target **1.2× speedup** 
-- **Sparse NN vs Dense cuBLAS (GPU):** Target **1.1× speedup**
-- Achieve these targets and receive **BONUS POINTS**!
 
 ### 📊 Metrics Tracked
 - **Per-Kernel Speedup:** Geometric mean speedup for each operation (GEMM, GEMV, SpMM, SpMV)
@@ -49,8 +41,8 @@ This is not just an assignment—it's a **COMPETITION**! Your implementations wi
    The results are printed in the `.out` file and also saved to `logs/cpu_speedup_report.txt` and `logs/gpu_speedup_report.txt`.
 
 2. **Sweep sizes.** CPU and GPU use the same sweep for matrix dimensions:
-   - `m` ∈ {256, 512, 1024, 2048, 4096, 8192, 16384}
-   - `k` ∈ {256, 512, 1024, 2048} 
+   - `m` ∈ {256, 512, 1024, 2048, 4096, 8192}
+   - `k` ∈ {32, 64, 256, 512} 
    - sparsity ∈ {50%, 70%, 80%, 90%}
 
    GEMM and SpMM compute `C = A @ B`, where `A` is `m × k` and `B` is `k × m`. GEMV and SpMV compute `y = A @ x`, where `A` is `m × m` and `x` is `m × 1`. For SpMM and SpMV, `A` is sparse.
@@ -67,9 +59,7 @@ This is not just an assignment—it's a **COMPETITION**! Your implementations wi
 3. **Recommendations.** While debugging, or if your kernels exceed the 45-minute job limit, you may comment out the larger dimension. For example, comment out the `->Args(...)` lines in `main_bench.cpp` for CPU and the `add_int64_axis(...)` values in `main_bench.cu` for GPU.
 
 
----
 
-## DEADLINE: 2026-11-27 23:59:59
 
 ## 🛠️ Logging in to the ECE Cluster
 The ECE computer server is a local server used for this course. The ECE server
@@ -141,158 +131,15 @@ the job will be saved in a `*.out` file.
 
 
 ## ✅ Tasks
-Deep neural networks (DNN) consist of multiple layers that perform matrix multiplications
-followed by nonlinear operations.
-In each layer, the input is multiplied by a weight matrix and then passed through a
-nonlinear activation function (tanh on the hidden layer, sigmoid on the output layer).
-The output of a layer becomes the input to the next layer.
-Matrix multiplication is the most computationally expensive operation in neural networks.
-Your main task is to implement a two-layer neural network.
-Implement both dense and sparse variants of the network and compare their accuracy
-and performance against state-of-the-art implementations.
 
-
-
-### DNN Description:
-A DNN with two linear layers and two non-linear activation functions.
-
-#### Mathematical Representation:
-
-Let's denote:
-
-`X:` Input vector (n-dimensional)
-
-`W1:` Weights matrix for the first layer (h x n)
-
-`b1:` Biases vector for the first layer (h-dimensional)
-
-`W2:` Weights matrix for the second layer (m x h)
-
-`b2:` Biases vector for the second layer (m-dimensional)
-
-`H:` Hidden layer activations (h-dimensional)
-
-`Z:` Output vector after sigmoid (m-dimensional)
-
-`Y:` Predicted class index
-
-The forward pass of a DNN with two layers can be represented as follows:
-
-`H = tanh(X * W1^T + b1)`
-
-`Z = sigmoid(H * W2^T + b2)`
-
-`Y = argmax(Z)`
-
-Where:
-
-tanh is an activation function, defined as:
-`tanh(Z) = (exp(Z) - exp(-Z)) / (exp(Z) + exp(-Z))`.
-
-sigmoid is another commonly used activation function in neural networks, defined as `1/(1 + exp(-Z))`.
-
-argmax returns the index of the maximum element in the vector.
-
-Explanation:
-
-*Input Layer:* The input data is fed into the input layer.
-
-*Hidden Layer:* The input is multiplied by the weights of the first layer, and the biases are added. The result is passed through the tanh activation function.
-
-*Output Layer:* The activations from the hidden layer are multiplied by the weights of the second layer, and the biases are added. The result is passed through the sigmoid activation function, which maps each component into (0, 1). Sigmoid does not make the components sum to 1.
-
-*Prediction:* Eventually argmax is used to predict the class label based on the output vector Z.
-
-
-We have already trained the weight matrices and biases for this network on the MNIST dataset.
-The weights and biases are included in the `data` folder; they are downloaded from the
-server when you run the provided `build_run.sh` script. See that script for details.
-All model parameters are stored as CSV files in the `data/model/` folder.
-The MNIST dataset is also provided in the `data` folder as a CSV file.
-Functions for reading these CSV files are provided.
-The MNIST CSV contains features and labels. After the header row is removed, column 0 is the label and the remaining columns are pixel values, which must be divided by 255 before the forward pass. The C++ network returns one class index per row, from `argmax` of `Z`.
-
-**Note:** The code assumes the data is in the `data` folder. If you set up the project in a
-different location than the server, update the paths accordingly.
-
-
-
-### Task 1: Dense Neural Network
-
-- Write a `Python` script (`script/dense_nn.py`) that implements the dense neural network described above. Measure and report the network
-  accuracy on the `MNIST` dataset.
-- Re-implement the same network in `C++` using your optimized matrix-matrix (`MM`) and matrix-vector (`MV`) operations.
-  Measure execution time of the key calls in the dense NN (for example, `MM`, `MV`, and activation functions).
-- Develop and optimize the `MM` and `MV` kernels before implementing the end-to-end C++ neural network.
-- Test these `MV` kernels with the first 10 features of the `MNIST` dataset for benchmarking purposes.
-- Document the optimization strategies applied to each operation and provide an analysis of the resulting performance improvements.
-
-
-### Task 2: Sparse Neural Network
-- Implement a pruning algorithm to sparsify the weight matrices (in `script/sparsify_weight.py`). Magnitude\-based pruning
-  (removing weights with the smallest absolute values) is acceptable.
-
-- Write a `Python` script to prune `W1` and `W2` for sparsity levels from 50\% to 95\% in steps of 5\%.
-  For each sparsity level, save the pruned weight matrices in dense CSV format using the naming convention:
-  `<sparsity_level>_W1.csv` and `<sparsity_level>_W2.csv` (for example, `80_W1.csv` and `80_W2.csv`).
-  When loading these files in `C++`, convert the dense matrices to a sparse format (e.g., CSR).
-
-- Implement efficient sparse matrix\-matrix (SpMM) and sparse matrix\-vector (SpMV) kernels. Document the optimization
-  strategies for each kernel and provide an analysis of the measured performance improvements.
-
-- After validating SpMV and SpMM, implement the sparse neural network using these operations. Report accuracy and
-  runtime for each sparsity level and compare the results with the dense neural network.
-
-### Task 3: GPU Implementation
-Implement both dense and sparse neural networks on the GPU. Use CSR format for sparse matrices on the GPU.
-First, implement optimized matrix-matrix (MM) and matrix-vector (MV) kernels on the GPU. Apply common GPU
-optimizations such as memory coalescing, tiling/shared memory, warp-level primitives, proper thread/block configuration,
-asynchronous copies, and tensor cores where applicable.
-Then build the dense and sparse neural networks using these kernels and compare their performance on the GPU.
-
-**Important Note** `build_run.sh` already passes `-DGPU_ENABLED=ON`. A manual CMake run needs that same flag.
-
-### Bonus Task: New Pruning Method and Outperforming vendor libraries
-* Implement a new pruning method that outperforms magnitude-based pruning in terms of performance while maintaining
-  similar accuracy. You may use any method.
-* Compare the performance of your dense and sparse neural networks with vendor libraries such as Intel MKL (CPU) and
-  cuBLAS/cuSPARSE (GPU). If you outperform these libraries, you will receive bonus points: target 1.2× faster than MKL
-  (sparse NN vs dense MKL) and 1.1× faster than cuBLAS (sparse NN vs dense cuBLAS).
-
-### The expected output
-Your submission must include the following:
-
-* Implementing dense NN using MM and MV operations (CPU and GPU).
-* Implementing sparse NN using SpMM and SpMV operations for different sparsity levels from 50% to 95% with
-  a step size of 5% (CPU and GPU). 
-* Bonus: build a new pruning method that outperforms magnitude-based pruning in terms of performance and provides a similar accuracy.
-* Outperforming cuBLAS/cuSPARSE and Intel MKL for dense and sparse NN implementations (bonus).
-* Provide a table for different optimizations applied to MM/MV and SpMM/SpMV operations (please follow the table and techniques in the matrix multiplication lecture).
-* Performance analysis of SpMM and SpMV across sparsity ranges and matrix sizes. 
-* Performance analysis of MM/MV across matrix sizes.
-* Repeat all above plots for GPU code as well.
-* The necessary Python scripts (and packages) to generate all plots. You won't be allowed to push plots to the repo.
-  We should be able to generate all plots using your scripts and the logs generated from running your
-  code on the ECE server.
-* Four benchmarks are provided in the main directory:
-    * `main_bench.cpp`: contains benchmarks for MM/MV/SpMM/SpMV on CPUs using Google Benchmark.
-    * `main_bench.cu` : contains benchmarks for MM/MV/SpMM/SpMV on GPUs using NVBench.
-    * `nn_cpu_bench.cpp`: contains benchmarks for dense and sparse neural networks on CPUs using Google Benchmark.
-    * `nn_gpu_bench.cu`: contains benchmarks for dense and sparse neural networks on GPU.
+- First pick a cool name for your group and update "GroupName.txt" in the root of the repository.
+- Do not change anything else except for the 4 functions and 4 kernels that you are required to implement. 
 
 
 ### Evaluation
-Your lab submission will be graded based on these criteria:
 
-* Your code compiles and runs successfully on the ECE cluster using the provided `build_run.sh` script (Pass/Fail).
-* All grading tests are passed as expected.
-* The quality of your plots and its analysis, which must:
-    * Convey a correct and clear argument.
-    * Be visually understandable with proper labels, units, and a concise 1-2 sentence executive summary.
-* All plots/model parameters must be generated using your provided Python scripts and the logs from your code runs on the ECE server.
-  Plots pushed directly to the repository will not be accepted.
-* Clearly explain all questions in the in-person interview. Negative points will be assigned for any plots/logs that are pushed to the repo.
-
+You can see your score, there will be three gmeans speedups. 
+We use the overall gmean speedup to rank the submissions. 
 
 
 ### Submission
@@ -306,28 +153,6 @@ Follow these guidelines for a successful submission:
 * The build_run.sh script's execution should only output results from Google Test and
   Google Benchmark. Do not include any extra output from cout or printf. This can negatively
   impact your grade, and regrade requests for this reason will not be accepted.
-* All logs should be redirected to `logs/` directory, all model parameters should be saved in
-  `data/model`, and all plots should be saved in the `plots/` directory. These directories are not
-  tracked by git to avoid pushing log files or plots to the repository.
+* If your code fails in any of the provided test cases, you will not be considered for the competition.
 
 
-## Descriptive Answers (TODO)
-Typically, there is no single correct answer/plot for the following questions. Rely on your thought process!
-
-### Plot(s) 1: CPU MM/MV and SpMV/SpMM performance analysis
-
-![Figure 1: CPU MM/MV and SpMV/SpMM performance](plots/plot1.png)
-
-Description: TODO: please provide details what each
-value in above plot means and how you draw a conclusion from it
-
-### Plot(s) 2: sparse / dense NN accuracy/performance analysis
-TODO: follow like above example
-
-
-### Plot(s) 3: GPU performance analysis
-TODO: follow like above example
-
-
-### Plot(s) 4: Bonus (if applicable)
-TODO: follow like above example
